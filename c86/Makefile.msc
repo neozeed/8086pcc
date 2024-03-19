@@ -1,0 +1,33 @@
+# File: Makefile (unix version)
+
+CC=cl
+
+
+OBJ0 = trees.obj optim.obj pftn.obj code.obj local.obj scan.obj xdefs.obj cgram.obj
+OBJ1 = reader.obj order.obj match.obj allo.obj 
+
+
+CFLAGS= /Ox /AL
+CPPFLAGS= 
+LIBS = 
+
+default: c86.exe
+
+ntable.obj -entry:mainCRTStartup $(LIBS)
+
+c86.exe: $(OBJ0) $(OBJ1) comm1.obj local2.obj table.obj
+	link @linkfile.c86
+
+
+
+
+clean:
+	@del /f c86.exe nc86.exe $(OBJ0) $(OBJ1) *.S *.i
+	@del /f comm1.obj     local2.obj    nlocal2.obj   ntable.obj    table.obj
+
+dclean:
+	@del /f *.obj *.S *.i
+
+
+
+
