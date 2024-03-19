@@ -1,0 +1,20 @@
+|fill memory: mfill(p, n, data) writes n bytes of data starting at p
+
+	.globl	_mfill
+	.text
+
+_mfill:	push	bp
+	mov	bp,sp
+	push	di
+
+	cld
+	mov	di,*4(bp)	| beginning of block
+	mov	cx,*6(bp)	| count
+	or	cx,cx
+	jz	Ldone		| check for zero count
+	mov	ax,*8(bp)	| used as source for sto
+	repz
+	stob
+Ldone:	pop	di
+	pop	bp
+	ret
