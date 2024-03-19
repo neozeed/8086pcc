@@ -1,5 +1,5 @@
 #include "mical.h"
-#include <a.out.h>
+#include "_a.out.h"
 
 /*  Handle output file processing for a.out files */
 
@@ -19,14 +19,14 @@ struct exec filhdr;	/* header for a.out files, contains sizes */
 Rel_Header()
   {	char rname[STR_MAX];	/* name of file for relocation commands */
 
-	if ((tout = fopen(Rel_name, "w")) == NULL ||
-		(dout = fopen(Rel_name, "a")) == NULL)
+	if ((tout = fopen(Rel_name, "wb")) == NULL ||
+		(dout = fopen(Rel_name, "ab")) == NULL)
 		Sys_Error("open on output file %s failed", Rel_name);
 
 	Concat(rname, Source_name, ".textr");
-	rtout = fopen(rname, "w");
+	rtout = fopen(rname, "wb");
 	Concat(rname, Source_name, ".datar");
-	rdout = fopen(rname, "w");
+	rdout = fopen(rname, "wb");
 	if (rtout == NULL || rdout == NULL)
 	  Sys_Error("open on output file %s failed", rname);
 
@@ -57,18 +57,18 @@ Fix_Rel()
 	fseek(dout, (long)(N_TXTOFF(filhdr)+tsize+dsize), 0);
 
 	Concat(rname, Source_name, ".textr");
-	if ((fin = fopen(rname, "r")) == NULL)
+	if ((fin = fopen(rname, "rb")) == NULL)
 		Sys_Error("cannot reopen relocation file %s", rname);
 	while ((i = getc(fin)) != EOF) putc(i,dout);
 	fclose(fin);
-	unlink(rname);
+	_unlink(rname);
 
 	Concat(rname, Source_name, ".datar");
-	if ((fin = fopen(rname, "r")) == NULL)
+	if ((fin = fopen(rname, "rb")) == NULL)
 		Sys_Error("cannot reopen relocation file %s", rname);
 	while ((i = getc(fin)) != EOF) putc(i,dout);
 	fclose(fin);
-	unlink(rname);
+	_unlink(rname);
 
 	filhdr.a_syms = Sym_Write(dout);
 

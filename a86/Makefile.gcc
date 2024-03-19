@@ -1,0 +1,57 @@
+# File: Makefile (unix version)
+
+CC=gcc
+AS=ax386
+CPP=cpp
+
+OBJ = error.obj init.obj ins.obj ps.obj rel.obj sdi.obj sym.obj scan.obj
+
+
+CFLAGS= 
+CPPFLAGS= -lang-c-c++-comments -nostdinc -I/xenixnt/h
+LIBS = libgcc.lib LIBC.LIB KERNEL32.LIB
+
+default: cvt86.exe as86.exe ld86.exe
+
+as86.exe: $(OBJ)
+	link /NODEFAULTLIB:libc.lib /NODEFAULTLIB:OLDNAMES.LIB  -out:as86.exe $(OBJ) -entry:mainCRTStartup $(LIBS)
+
+cvt86.exe: cvt86.obj
+	link /NODEFAULTLIB:libc.lib /NODEFAULTLIB:OLDNAMES.LIB  -out:cvt86.exe cvt86.obj -entry:mainCRTStartup $(LIBS)
+
+ld86.exe: ld86.obj
+	link /NODEFAULTLIB:libc.lib /NODEFAULTLIB:OLDNAMES.LIB  -out:ld86.exe ld86.obj -entry:mainCRTStartup $(LIBS)
+
+
+nc86.exe: $(OBJ0) $(OBJ1) comm1.obj nlocal2.obj ntable.obj
+	link /NODEFAULTLIB:libc.lib /NODEFAULTLIB:OLDNAMES.LIB  -out:nc86.exe $(OBJ0) $(OBJ1) comm1.obj nlocal2.obj ntable.obj -entry:mainCRTStartup $(LIBS)
+
+c86.exe: $(OBJ0) $(OBJ1) comm1.obj local2.obj table.obj
+	link /NODEFAULTLIB:libc.lib /NODEFAULTLIB:OLDNAMES.LIB  -out:c86.exe $(OBJ0) $(OBJ1) comm1.obj local2.obj table.obj -entry:mainCRTStartup $(LIBS)
+
+nlocal2.obj: local2.c
+	$(CPP) $(CPPFLAGS) local2.c local2.i
+	$(CC) $(CFLAGS) $(INCLUDE) -S -o local2.S local2.i
+	$(AS) local2.S -o nlocal2.obj
+
+ntable.obj: table.c
+	$(CPP) $(CPPFLAGS) table.c table.i
+	$(CC) $(CFLAGS) $(INCLUDE) -S -o table.S table.i
+	$(AS) table.S -o ntable.obj
+
+%.obj: %.c
+	$(CPP) $(CPPFLAGS) $< $*.i
+	cc1 $(CFLAGS) -quiet -o $*.S $*.i
+	$(AS) $*.S -o $*.obj
+
+
+clean:
+	@del /f as86.exe cvt86.exe ld86.exe $(OBJ) *.obj *.S *.i
+
+
+dclean:
+	@del /f *.obj *.S *.i
+
+
+
+
