@@ -1,12 +1,14 @@
 # include <stdio.h>
 # include <signal.h>
+# include <io.h>
+# include <process.h>
 
 # include "mfile1"
 
 int proflag;
 int strftn = 0;	/* is the current function one which returns a value */
-FILE *tmpfile;
-FILE *outfile = stdout;
+FILE *Ltmpfile;
+FILE *outfile;	// = stdout;
 
 branch( n ){
 	/* output a branch to label n */
@@ -44,7 +46,7 @@ locctr( l ){
 
 	case STRNG:
 	case ISTRNG:
-		outfile = tmpfile;
+		outfile = Ltmpfile;
 		break;
 
 	case STAB:
@@ -228,7 +230,8 @@ where(c){ /* print location of error  */
 	fprintf( stderr, "%s, line %d: ", ftitle, lineno );
 	}
 
-char *tmpname = "/tmp/pcXXXXXX";
+//char *tmpname = "/tmp/pcXXXXXX";
+char tmpname[16];
 
 main( argc, argv ) char *argv[]; {
 	int dexit();
@@ -236,30 +239,37 @@ main( argc, argv ) char *argv[]; {
 	register int i;
 	int r;
 
+	outfile = stdout;
+
 	for( i=1; i<argc; ++i )
 		if( argv[i][0] == '-' && argv[i][1] == 'X' && argv[i][2] == 'p' ) {
 			proflag = 1;
 			}
 
-	mktemp(tmpname);
+sprintf(tmpname,"/tmp/pc%06d",_getpid());
+//printf("tmpname %s\n",tmpname);
+//	mktemp(tmpname);
+#if SIGNALS
 	if(signal( SIGHUP, SIG_IGN) != SIG_IGN) signal(SIGHUP, dexit);
 	if(signal( SIGINT, SIG_IGN) != SIG_IGN) signal(SIGINT, dexit);
 	if(signal( SIGTERM, SIG_IGN) != SIG_IGN) signal(SIGTERM, dexit);
-	tmpfile = fopen( tmpname, "w" );
+#endif
+//printf("using tmpfile %s\n",tmpname);
+	Ltmpfile = fopen( tmpname, "w" );
 
 	r = mainp1( argc, argv );
 
-	tmpfile = freopen( tmpname, "r", tmpfile );
-	if( tmpfile != NULL )
-		while((c=getc(tmpfile)) != EOF )
+	Ltmpfile = freopen( tmpname, "r", Ltmpfile );
+	if( Ltmpfile != NULL )
+		while((c=getc(Ltmpfile)) != EOF )
 			putchar(c);
 	else cerror( "Lost temp file" );
-	unlink(tmpname);
+	_unlink(tmpname);
 	return( r );
 	}
 
 dexit( v ) {
-	unlink(tmpname);
+	_unlink(tmpname);
 	exit(1);
 	}
 

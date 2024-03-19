@@ -102,7 +102,7 @@ mainp1( argc, argv ) int argc; char *argv[]; {  /* control multiple files */
 
 	/* dimension table initialization */
 
-	dimtab[NULL] = 0;
+	dimtab[0] = 0;
 	dimtab[CHAR] = SZCHAR;
 	dimtab[INT] = SZINT;
 	dimtab[FLOAT] = SZFLOAT;

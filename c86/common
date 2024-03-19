@@ -4,7 +4,7 @@
 
 int nerrors = 0;  /* number of errors */
 
-unsigned int offsz;
+extern unsigned int offsz;
 
 unsigned caloff(){
 	register i;
