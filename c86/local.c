@@ -198,7 +198,7 @@ incode( p, sz ) register NODE *p; {
 	/* we also assume sz  < SZINT */
 
 	if((sz+inwd) > SZINT) cerror("incode: field > int");
-	word |= (p->tn.lval<<inwd) & ((unsigned int)-1 >> (SZINT-inwd-sz));
+	word |= p->tn.lval<<inwd;
 	inwd += sz;
 	inoff += sz;
 	if(inoff%SZINT == 0) {
@@ -211,45 +211,30 @@ fincode( d, sz ) double d; {
 	/* output code to initialize space of size sz to the value d */
 	/* the proper alignment has been obtained */
 	/* inoff is updated to have the proper final value */
-	/* on the target machine, write it out in hex! */
+	/* on the target machine, write it out in octal! */
 
 	register short *mi = (short *)&d;
 	int sign,exp,frac1,frac2,frac3,frac4;
 	extern FILE *outfile;
 
-#ifdef vax|pdp11
-	/* the code below unpacks the PDP11/VAX floating point representation
-	 * and reassembles it for the 8087.  Of course, it should only be
-	 * expected to work on VAXes and PDP11's...
-	 */
-	sign = (mi[0] >> 15) & 1;	/* sign */
-	exp = ((mi[0] >> 7) & 0377) - 128;	/* unbiased exponent */
-	frac1 = (mi[0]<<9) | ((mi[1]>>7) & 0777);
-	frac2 = (mi[1]<<9) | ((mi[2]>>7) & 0777);
-	frac3 = (mi[2]<<9) | ((mi[3]>>7) & 0777);
-	frac4 = mi[3]<<9;
-
 	if( sz==SZDOUBLE ) {
-	  if (d == 0.0) exp = 0;		/* zeroes are special */
-	  else exp += 1023 - 1;
+	  sign = (mi[0] >> 15) & 1;	/* sign */
+	  exp = ((mi[0] >> 7) & 0377) - 128;	/* unbiased exponent */
+	  frac1 = (mi[0]<<9) | ((mi[1]>>7) & 0777);
+	  frac2 = (mi[1]<<9) | ((mi[2]>>7) & 0777);
+	  frac3 = (mi[2]<<9) | ((mi[3]>>7) & 0777);
+	  frac4 = mi[3]<<9;
+
+	  if (d == 0.0) exp = 0;			/* zeroes are special */
+	  else exp = exp - 1 + 1023;
 
 	  fprintf(outfile, "	.word 0x%x,0x%x,0x%x,0x%x\n",
 		  ((frac3 << 4) | ((frac4 >> 12) & 017)) & 0177777,
 		  ((frac2 << 4) | ((frac3 >> 12) & 017)) & 0177777,
 		  ((frac1 << 4) | ((frac2 >> 12) & 017)) & 0177777,
 		  (sign<<15) | ((exp & 03777) << 4) | ((frac1 >> 12) & 017));
-	} else {
-	  if (d == 0.0) exp = 0;		/* zeroes are special */
-	  else exp += 127 - 1;
-
-	  fprintf(outfile, "	.word 0x%x,0x%x\n",
-		  ((frac1 << 7) | ((frac2 >> 9) & 0177)) & 0177777,
-		  (sign<<15) | ((exp & 0377) << 7) | ((frac1 >> 9) & 0177));
-	}
+	} else fprintf(outfile, "	.word 0x%x,0x%x\n", mi[1], mi[0]);
 	inoff += sz;
-#else
-	cerror( "fincode routine in local.c needs to be fixed up!" );
-#endif
 	}
 
 cinit( p, sz ) NODE *p; {
@@ -283,7 +268,7 @@ exname( p ) char *p; {
 	register i;
 
 	text[0] = '_';
-	for( i=1; *p&&(i<NCHNAM); ++i ){
+	for( i=1; *p&&i<NCHNAM; ++i ){
 		text[i] = *p++;
 		}
 
