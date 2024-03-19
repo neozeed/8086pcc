@@ -3,71 +3,14 @@ static	char sccsid[] = "@(#)ld.c 4.4 4/26/81";
  * ld86 - string table version for 8086 (snarfed from 4.1BSD)
  */
 
-//#include "_sys_param.h"
+#include <sys/param.h>
 #include <signal.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <fcntl.h>
-//#include <sys/types.h>
-//#include <sys/stat.h>
-#include "_ar.h"
-#include "_a.out.h"
-#include "_ranlib.h"
-//#include "_sys_stat.h"
-
-///
-#if 1
-#define	n_hash	n_desc		/* used internally by ld */
-
-typedef short _dev_t;                   /* device code */
-typedef unsigned short _ino_t;          /* i-node number (not used on DOS) */
-typedef long time_t;
-struct stat {
-	_dev_t st_dev;
-	_ino_t st_ino;
-	unsigned short st_mode;
-	short st_nlink;
-	short st_uid;
-	short st_gid;
-	_dev_t st_rdev;
-	_off_t st_size;
-	time_t st_atime;
-	time_t st_mtime;
-	time_t st_ctime;
-	};
-#endif
-
-/* Non-ANSI names for compatibility */
-#define access	   _access
-#define chmod	   _chmod
-#define chsize	   _chsize
-#define close	   _close
-#define creat	   _creat
-#define dup	   _dup
-#define dup2	   _dup2
-#define eof	   _eof
-#define filelength _filelength
-#define isatty	   _isatty
-#define locking    _locking
-#define lseek	   _lseek
-#define mktemp	   _mktemp
-#define open	   _open
-#define read	   _read
-#define setmode    _setmode
-#define sopen	   _sopen
-#define tell	   _tell
-#define umask	   _umask
-#define unlink	   _unlink
-#define write	   _write
-#define cfree	   free
-#define fstat	   _fstat
-#define link	   link
-
-#define DEV_BSIZE       512
-#define DEV_BSHIFT      9               /* log2(DEV_BSIZE) */
-
-
-///
+#include <ar.h>
+#include <a.out.h>
+#include <ranlib.h>
+#include <sys/stat.h>
 
 #define	PAGSIZ	(DEV_BSIZE)
 #define DEV_BMASK	(DEV_BSIZE - 1)
@@ -647,7 +590,7 @@ load1arg(cp)
 		nloc = SARMAG;
 		while (step(nloc))
 			nloc += sizeof(archdr) +
-			    rround(atol(archdr.ar_size), sizeof (short));
+			    round(atol(archdr.ar_size), sizeof (short));
 		break;
 
 	/*
@@ -700,7 +643,7 @@ load1arg(cp)
 		nloc = SARMAG;
 		do
 			nloc += sizeof(archdr) +
-			    rround(atol(archdr.ar_size), sizeof(short));
+			    round(atol(archdr.ar_size), sizeof(short));
 		while (step(nloc));
 		break;
 	}
@@ -851,8 +794,8 @@ load1(libflg, loc)
 	}
 	if (libflg==0 || ndef) {
 		tsize += filhdr.a_text;
-		dsize += rround(filhdr.a_data, sizeof (long));
-		bsize += rround(filhdr.a_bss, sizeof (long));
+		dsize += round(filhdr.a_data, sizeof (long));
+		bsize += round(filhdr.a_bss, sizeof (long));
 		ssize += nlocal;
 		trsize += filhdr.a_trsize;
 		drsize += filhdr.a_drsize;
@@ -914,7 +857,7 @@ middle()
 	csize = 0;
 	if (!Aflag)
 		addsym = symseg[0].sy_first;
-	database = rround(tsize+textbase,
+	database = round(tsize+textbase,
 	    (nflag||zflag? PAGSIZ : sizeof (long)));
 	database += hsize;
 	if (dflag || rflag==0) {
@@ -931,7 +874,7 @@ middle()
 					rnd = sizeof (long);
 				else
 					rnd = sizeof (short);
-				csize = rround(csize, rnd);
+				csize = round(csize, rnd);
 				sp->n_value = csize;
 				sp->n_type = N_EXT+N_COMM;
 				ocsize = csize;	
@@ -946,7 +889,7 @@ middle()
 	/*
 	 * Now set symbols to their final value
 	 */
-	csize = rround(csize, sizeof (long));
+	csize = round(csize, sizeof (long));
 	torigin = textbase;
 	dorigin = database;
 	corigin = dorigin + dsize;
@@ -1029,7 +972,7 @@ struct	biobuf toutb;
 setupout()
 {
 	int bss;
-	//extern char *sys_errlist[];
+	extern char *sys_errlist[];
 	extern int errno;
 
 	ofilemode = 0777 & ~umask(0);
@@ -1037,8 +980,7 @@ setupout()
 	if (biofd < 0) {
 		filname = ofilename;		/* kludge */
 		archdr.ar_name[0] = 0;		/* kludge */
-		//error(1, sys_errlist[errno]);	/* kludge */
-		error(1,"something");
+		error(1, sys_errlist[errno]);	/* kludge */
 	} else {
 		struct stat mybuf;		/* kls kludge */
 		fstat(biofd, &mybuf);		/* suppose file exists, wrong*/
@@ -1051,8 +993,8 @@ setupout()
 	bopen(tout, 0);
 	filhdr.a_magic = nflag ? NMAGIC : (zflag ? ZMAGIC : OMAGIC);
 	filhdr.a_text = nflag ? tsize :
-	    rround(tsize, zflag ? PAGSIZ : sizeof (long));
-	filhdr.a_data = zflag ? rround(dsize, PAGSIZ) : dsize;
+	    round(tsize, zflag ? PAGSIZ : sizeof (long));
+	filhdr.a_data = zflag ? round(dsize, PAGSIZ) : dsize;
 	bss = bsize - (filhdr.a_data - dsize);
 	if (bss < 0)
 		bss = 0;
@@ -1258,8 +1200,8 @@ long loc;
 		filhdr.a_data++;
 	}
 	torigin += filhdr.a_text;
-	dorigin += rround(filhdr.a_data, sizeof (long));
-	borigin += rround(filhdr.a_bss, sizeof (long));
+	dorigin += round(filhdr.a_data, sizeof (long));
+	borigin += round(filhdr.a_bss, sizeof (long));
 	free(curstr);
 }
 
@@ -1316,8 +1258,8 @@ tracesym()
  * each relocation datum address by our base position in the new segment.
  */
 load2td(creloc, position, b1, b2)
-        long creloc, position;
-        struct biobuf *b1, *b2;
+	long creloc, offset;
+	struct biobuf *b1, *b2;
 {
 	register struct nlist *sp;
 	register struct local *lp;
@@ -1468,7 +1410,7 @@ finishout()
 	}
 	if (!ofilfnd) {
 		unlink("a.out");
-		//if (link("l.out", "a.out") < 0)
+		if (link("l.out", "a.out") < 0)
 			error(1, "cannot move l.out to a.out");
 		ofilename = "a.out";
 	}
@@ -1642,13 +1584,13 @@ char *acp;
 		filname[c+12] = locfilname[c+18] = '.';
 		filname[c+13] = locfilname[c+19] = 'a';
 		filname[c+14] = locfilname[c+20] = '\0';
-		if ((infil = open(filname+4, _O_CREAT|_O_BINARY|0)) >= 0) {
+		if ((infil = open(filname+4, 0)) >= 0) {
 			filname += 4;
-		} else if ((infil = open(filname, _O_CREAT|_O_BINARY|0)) < 0) {
+		} else if ((infil = open(filname, 0)) < 0) {
 			filname = locfilname;
 		}
 	}
-	if (infil == -1 && (infil = open(filname, _O_CREAT|_O_BINARY|0)) < 0)
+	if (infil == -1 && (infil = open(filname, 0)) < 0)
 		error(1, "cannot open");
 	page[0].bno = page[1].bno = -1;
 	page[0].nuser = page[1].nuser = 0;
@@ -1859,7 +1801,7 @@ off_t loc;
 	if (filhdr.a_text&01 || filhdr.a_data&01)
 		error(1, "text/data size odd");
 	if (filhdr.a_magic == NMAGIC || filhdr.a_magic == ZMAGIC) {
-		cdrel = -rround(filhdr.a_text, PAGSIZ);
+		cdrel = -round(filhdr.a_text, PAGSIZ);
 		cbrel = cdrel - filhdr.a_data;
 	} else if (filhdr.a_magic == OMAGIC) {
 		cdrel = -filhdr.a_text;
@@ -1868,9 +1810,9 @@ off_t loc;
 		error(1, "bad format");
 }
 
-rround(v, r)
+round(v, r)
 	int v;
-	unsigned long r;
+	u_long r;
 {
 
 	r--;
@@ -1935,7 +1877,7 @@ top:
 			put = cnt;
 		bp->b_nleft -= put;
 		to = bp->b_ptr;
-//		asm("movc3 r8,(r11),(r7)");
+		asm("movc3 r8,(r11),(r7)");
 		bp->b_ptr += put;
 		p += put;
 		cnt -= put;

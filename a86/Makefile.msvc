@@ -1,4 +1,6 @@
 OBJ = error.obj init.obj ins.obj ps.obj rel.obj sdi.obj sym.obj scan.obj
 
+CFLAGS = /Zp4
+
 a86.exe: $(OBJ)
 	link $(LDEBUG) -out:a86.exe $(OBJ) $(LIBS)

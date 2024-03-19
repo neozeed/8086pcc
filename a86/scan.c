@@ -36,8 +36,7 @@ char segflag;		/* <>0 if segment prefix seen on current line */
 
 main(argc,argv)
   char *argv[];
-  {	//printf("scan.c\n");
-	Init(argc,argv);
+  {	Init(argc,argv);
 	scan();
 	End();
 	scan();

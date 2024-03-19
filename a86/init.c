@@ -1,8 +1,6 @@
 #include "mical.h"
 #include "inst.h"
 
-#define INULL 0
-
 char Title[STR_MAX];
 char O_outfile = 0;		/* 1 if .rel file name is specified by uder */
 int Pass = 0;			/* which pass we're on */
@@ -201,7 +199,7 @@ struct ins_init { char *opstr; short opnum; } op_codes[] = {
 	".zerow", i_zerow,
 	0 };
 
-char *Source_name = INULL;
+char *Source_name = NULL;
 char File_name[STR_MAX];
 
 Init(argc,argv)
@@ -219,19 +217,19 @@ char *argv[];
 			break;
 
 	    default:	fprintf(stderr,"Unknown option '%c' ignored.\n",argv[0][1]);
-	  } else if (Source_name != INULL) {
+	  } else if (Source_name != NULL) {
 	    fprintf(stderr,"Too many file names given\n");
 	  } else {
 	    Source_name = argv[0];
 	    Concat(File_name, argv[0], ".a86");
-	    if (freopen(File_name,"r",stdin) == INULL) {/* open source file */
+	    if (freopen(File_name,"r",stdin) == NULL) {/* open source file */
 	      if ((end = rindex(Source_name, '.')) == 0 ||
 			strcmp(end, ".a86") != 0) {
 	        fprintf(stderr,"Can't open source file: %s\n",File_name);
 	        exit(1);
 	      }
 	      strncpy(File_name, argv[0], STR_MAX);
-	      if (freopen(File_name,"r",stdin) == INULL) {/* open source file */
+	      if (freopen(File_name,"r",stdin) == NULL) {/* open source file */
 	        fprintf(stderr,"Can't open source file: %s\n",File_name);
 	        exit(1);
 	      }
@@ -254,7 +252,7 @@ char *argv[];
 			strcpy(cp2, ".b");	/* append ".b" to basename */
 		}
 	}
-	if ((Rel_file = fopen(Rel_name,"wb")) == INULL)
+	if ((Rel_file = fopen(Rel_name,"wb")) == NULL)
 	{	printf("Can't create output file: %s\n",Rel_name);
 		exit(1);
 	}
@@ -317,9 +315,10 @@ Concat(s1,s2,s3)
 
 /*
  * Return the ptr in sp at which the character c last
- * appears; INULL if not found
+ * appears; NULL if not found
 */
 
+#define LNULL 0
 
 char *
 rindex(sp, c)
@@ -327,7 +326,7 @@ register char *sp, c;
 {
 	register char *r;
 
-	r = INULL;
+	r = LNULL;
 	do {
 		if (*sp == c)
 			r = sp;
