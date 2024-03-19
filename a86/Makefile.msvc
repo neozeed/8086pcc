@@ -2,5 +2,19 @@ OBJ = error.obj init.obj ins.obj ps.obj rel.obj sdi.obj sym.obj scan.obj
 
 CFLAGS = /Zp4
 
+default: a86.exe cvt86.exe
+
+cvt86.exe: cvt86.obj
+	link -out:cvt86.exe cvt86.obj $(LIBS)
+
+
 a86.exe: $(OBJ)
-	link $(LDEBUG) -out:a86.exe $(OBJ) $(LIBS)
+	link -out:a86.exe $(OBJ) $(LIBS)
+
+# The linker has vax assembly embedded, it'll never work
+# ld86.exe: ld86.obj
+#	link -out:ld86.exe ld86.obj $(LIBS)
+
+
+clean:
+	@del $(OBJ) cvt86.obj a86.exe cvt86.exe

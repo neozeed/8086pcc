@@ -18,6 +18,13 @@ nc86.exe: $(OBJ0) $(OBJ1) comm1.obj nlocal2.obj ntable.obj
 c86.exe: $(OBJ0) $(OBJ1) comm1.obj local2.obj table.obj
 	link /NODEFAULTLIB:libc.lib /NODEFAULTLIB:OLDNAMES.LIB  -out:c86.exe $(OBJ0) $(OBJ1) comm1.obj local2.obj table.obj -entry:mainCRTStartup $(LIBS)
 
+
+local2.obj: local2.c
+	$(CC) $(CFLAGS) /DX8087 /c /Folocal2.obj local2.c
+
+table.obj: table.c
+	$(CC) $(CFLAGS) /DX8087 /c /Fotable.obj table.c
+
 nlocal2.obj: local2.c
 	$(CC) $(CFLAGS) /c /Fonlocal2.obj local2.c
 
@@ -32,7 +39,7 @@ ntable.obj: table.c
 
 clean:
 	@del /f c86.exe nc86.exe $(OBJ0) $(OBJ1) *.S *.i
-	@del /f comm1.obj     local2.obj    nlocal2.obj   ntable.obj    table.obj
+	@del /f comm1.obj local2.obj nlocal2.obj ntable.obj table.obj
 
 dclean:
 	@del /f *.obj *.S *.i

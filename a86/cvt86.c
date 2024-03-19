@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <a.out.h>
+#include "_a.out.h"
 
 /* convert a.out files into .com files for IBM Dos system */
 
@@ -51,12 +51,12 @@ main(argc,argv)
 	  exit(1);
 	}
 
-	if ((infile = fopen(argv[1],"r")) == NULL) {
+	if ((infile = fopen(argv[1],"rb")) == NULL) {
 	  fprintf(stderr,"cvt86: cannot open %s for input\n",argv[1]);
 	  exit(1);
 	}
 
-	if ((outfile = fopen(argv[2],"w")) == NULL) {
+	if ((outfile = fopen(argv[2],"wb")) == NULL) {
 	  fprintf(stderr,"cvt86: cannot open %s for output\n",argv[2]);
 	  exit(1);
 	}
