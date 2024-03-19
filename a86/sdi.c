@@ -211,7 +211,10 @@ register struct blist *p;
 	register struct blist *q;
 	while(p) {
 		q = p->b_next;
-		free(p);
+//
+//	We have infinite ram anyways
+//
+//		free(p);
 		p = q;
 	}
 }
