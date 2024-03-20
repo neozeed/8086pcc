@@ -1,8 +1,9 @@
-OBJ = cplus-dem.obj getopt.obj getopt1.obj ld.obj alloca.obj
+CC = gcc
+OBJ = cplus-dem.o getopt.o getopt1.o ld.o alloca.o
 CFLAGS = -I. -DUSG -DHZ=60
 
 ld.exe: $(OBJ)
-	link -out:ld.exe $(OBJ)
+	$(CC) -o ld.exe $(OBJ)
 
 
 clean:
