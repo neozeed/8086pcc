@@ -1,12 +1,14 @@
 # include <stdio.h>
 # include <signal.h>
+# include <io.h>
+# include <process.h>
 
 # include "mfile1"
 
 int proflag;
 int strftn = 0;	/* is the current function one which returns a value */
-FILE *ztmpfile;
-FILE *outfile = stdout;
+FILE *Ltmpfile;
+FILE *outfile;	// = stdout;
 
 branch( n ){
 	/* output a branch to label n */
@@ -44,7 +46,7 @@ locctr( l ){
 
 	case STRNG:
 	case ISTRNG:
-		outfile = ztmpfile;
+		outfile = Ltmpfile;
 		break;
 
 	case STAB:
@@ -228,13 +230,16 @@ where(c){ /* print location of error  */
 	fprintf( stderr, "%s, line %d: ", ftitle, lineno );
 	}
 
-char *tmpname = "/tmp/pcXXXXXX";
+//char *tmpname = "/tmp/pcXXXXXX";
+char tmpname[16];
 
 main( argc, argv ) char *argv[]; {
 	int dexit();
 	register int c;
 	register int i;
 	int r;
+
+	outfile = stdout;
 
 	for( i=1; i<argc; ++i )
 		if( argv[i][0] == '-' && argv[i][1] == 'X' && argv[i][2] == 'p' ) {
@@ -244,18 +249,19 @@ main( argc, argv ) char *argv[]; {
 sprintf(tmpname,"/tmp/pc%06d",_getpid());
 //printf("tmpname %s\n",tmpname);
 //	mktemp(tmpname);
-#ifdef SIGNALS
+#if SIGNALS
 	if(signal( SIGHUP, SIG_IGN) != SIG_IGN) signal(SIGHUP, dexit);
 	if(signal( SIGINT, SIG_IGN) != SIG_IGN) signal(SIGINT, dexit);
 	if(signal( SIGTERM, SIG_IGN) != SIG_IGN) signal(SIGTERM, dexit);
 #endif
-	ztmpfile = fopen( tmpname, "w" );
+//printf("using tmpfile %s\n",tmpname);
+	Ltmpfile = fopen( tmpname, "w" );
 
 	r = mainp1( argc, argv );
 
-	ztmpfile = freopen( tmpname, "r", ztmpfile );
-	if( ztmpfile != NULL )
-		while((c=getc(ztmpfile)) != EOF )
+	Ltmpfile = freopen( tmpname, "r", Ltmpfile );
+	if( Ltmpfile != NULL )
+		while((c=getc(Ltmpfile)) != EOF )
 			putchar(c);
 	else cerror( "Lost temp file" );
 	_unlink(tmpname);
@@ -279,10 +285,9 @@ genswitch(p,n) register struct sw *p;{
 	register dlab, swlab;
 
 	range = p[n].sval-p[1].sval;
+	dlab = p->slab >= 0 ? p->slab : getlab();
 
 	if( range>0 && range <= 3*n && n>=4 ){ /* implement a direct switch */
-
-		dlab = p->slab >= 0 ? p->slab : getlab();
 
 		if( p[1].sval ){
 			printf( "	sub	ax,#" );
@@ -297,26 +302,21 @@ genswitch(p,n) register struct sw *p;{
 		printf( "	bhi	L%d\n", dlab );
 		printf( "	sal	ax,*1\n" );
 		printf( "	xchg	ax,bx\n" );
-		printf( "	jmp	@L%d(bx)\n", swlab = getlab() );
+		printf( "	jmp	cs:@L%d(bx)\n", swlab = getlab() );
 
 		/* output table */
 
-		printf("\t.data\nL%d:\n", swlab );
+		printf("L%d:\n", swlab );
 
 		for( i=1,j=p[1].sval; i<=n; ++j )
 		  printf( "\t.word\tL%d\n", ( j == p[i].sval ) ? p[i++].slab : dlab);
 
-		printf("\t.text\n");
+	} else genbinary(p,1,n,0,dlab);		/* do binary search */
 
-		if( p->slab< 0 ) deflab( dlab );
-		return;
-
-		}
-
-	genbinary(p,1,n,0);		/* do binary search */
+	if( p->slab< 0 ) deflab( dlab );
 }
 
-genbinary(p,lo,hi,lab)
+genbinary(p,lo,hi,lab,dlab)
   register struct sw *p;
   {	register int i,lab1;
 
@@ -328,14 +328,14 @@ genbinary(p,lo,hi,lab)
 	  printf( CONFMT, p[i].sval );
 	  printf( "\n	beq	L%d\n", p[i].slab );
 	  printf( "	bgt	L%d\n", lab1=getlab() );
-	  genbinary(p,lo,i-1,0);
-	  genbinary(p,i+1,hi,lab1);
+	  genbinary(p,lo,i-1,0,dlab);
+	  genbinary(p,i+1,hi,lab1,dlab);
 	} else {			/* simple switch code for remaining cases */
 	  for( i=lo; i<=hi; ++i ) {
 	    printf( "	cmp	ax,#" );
 	    printf( CONFMT, p[i].sval );
 	    printf( "\n	beq	L%d\n", p[i].slab );
 	  }
-	  if( p->slab>=0 ) branch( p->slab );
+	  branch( dlab );
 	}
 }
