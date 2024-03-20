@@ -1,0 +1,84 @@
+Directory setup:
+  c86:		C-compiler source
+  a86:		assembler, loader, and .com file builder
+  lib86:	C run-time library and include directory
+
+You should install the following files into some directory on your
+search path (on our system we use /usr/local):
+
+	cc86		; shell script implements "cc" but for 8086/8088
+	a86/a86		; the assembler
+	a86/ld86	; the loader
+	a86/cvt86	; .ld output to .com file conversion
+	c86/c86		; the C compiler (8087 version)
+	c86/nc86	; the C compiler (non-8087 version)
+
+Regular 4.1BSD programs used:
+
+	ar		; used for preparing loader libraries
+	/lib/cpp	; C preprocessor
+
+The cc86 script expects to find the include directory, libc.a and crt files in
+/src/Machines/8086/lib86 -- if you don't put them there, you'll
+have to update the value of the LIB variable in cc86.
+
+cc86 is a shell script that implements a cc command similar to the
+regular UNIX cc.  It's options are:
+
+  -8087		use the 8087 version of the compiler and run-time
+		library.  By default, the non-8087 versions are used.
+
+  -P		run only the C preprocessor (cpp) and leave the result
+		in foo.i, where foo.c was the input file.
+
+  -S		do not run the assembler, leaving the assembly language
+		output file in foo.a86, where foo.c was the input file.
+
+  -c		compile, assemble, but do not create a .com file, leaving
+		binary file in foo.b, where foo.c was the input file.
+
+		If this option is not specified, "a.com" is created from
+		the specified files (uses crt0.b and libc.a to create a program
+		that will emulate the Unix environment -- to the extent
+		possible -- under MSDOS).  "a.ld" is also created; it is a
+		Berkeley-format load module from which a symbol table can be
+		extracted using nm.
+
+  -o name	changes the name of the generated .com file to "name.com"
+
+  -Ilib		specifies a directory to be searched when processing #include
+		statements during preprocessor stage.
+
+  -Dsymbol	Defines "symbol" to have the value 1 during preprocessing.
+		By default, the symbols "ibm" and "IBMDOS" are defined.
+
+  -Usymbol	Undefines "symbol" during preprocessing.
+
+Source files with .c suffixes are assumed to be C source files and are
+processed by the compiler, source files with .a86 suffixes are assumed to
+be assembly language source files and are fed to the assembler.
+
+The compiler produces assembly language output suitable for a86 (but
+it's not compatible with IBM/Microsoft assembly language).
+It is a 16-bit compiler; output code does not touch the segment
+regs, so it is possible to have separate instruction and data
+segments (see lib86/csu/crt0.a86 for the start up routine we use
+on our IBM Personal computer to set up the segment regs, etc. from
+info in the .com file).  The code does use ES, which it assumes
+is set to the same value as the DS register.
+
+The floating-point version of the compiler produces code that uses
+the 8087; the code is serviceable but not the most efficient, support
+for "floats" (32-bit floating-point quantities) may be a little shaky.
+The non-8087 version of the compiler does not support floating-point
+at all, ie, if you don't have an 8087, you can't do floating-point
+(hopefully, this will get fixed in the future...).
+
+Although the assembler produces ".b" files, they have exactly the
+same format as ".o" files under 4.1BSD -- things like nm and size will
+work, and, most importantly, ld.  Using ld with the -N, -X and -r
+options (see cc86 for an example) will produce a file that cvt86 can
+convert into an IBM DOS format .com file for the IBM Personal Computer.
+The ld86 program is a slightly modified version of the Berkeley loader
+for the VAX.
+

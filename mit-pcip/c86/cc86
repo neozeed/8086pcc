@@ -1,0 +1,66 @@
+o=a.com P= Q= S= C= O="-DIBMDOS -Uvax -Dibm"
+CC=nc86 LIBC=nlibc.a
+LIB=/src/Machines/8086/lib86
+X= Y=crt0.b Z=
+trap "rm -f $T.i $T.a86; exit 1" 1 2 15
+
+for A in $*
+do
+	if test $o
+	then
+	case $A in
+	-8087)	CC=c86 LIBC=libc.a ;;
+	-P)	P=XXX; set O="$O -P" ;;
+	-S)	S=XXX ;;
+	-O)	Q=XXX ;;
+	-c)	C=XXX ;;
+	-p)	X="-Xp" Y=mcrt0.b ;;
+	-o)	o= ;;
+	-[IDU]*)        O="$O $A" ;;
+	-*)     echo >&2 "bad cc86 option: $A"; exit 1;;
+	*.b)	Z="$Z $A" ;;
+	*.a86)	T=`basename $A .a86`
+		a86 $T
+		Z="$Z $T.b";;
+	*.c)	T=`basename $A .c`
+		if /lib/cpp -I$LIB/include $O $A >$T.i
+		then	if test $P
+			then :
+			else	if $CC $X <$T.i >$T.a86
+				then	if test $Q
+					then	mv $T.a86 $T.o
+						o86 <$T.o >$T.a86
+						rm -f $T.o
+					fi
+					if test $S
+					then :
+					else	a86 $T; rm -f $T.a86
+					 	Z="$Z $T.b"
+					fi
+				else rm -f $T.a86
+				fi
+				rm -f $T.i
+			fi
+		else	rm -f $T.i
+		fi;;
+	*)	echo >&2 "bad cc86 argument: $A"; rm -f $T.i $T.a86; exit 1
+	esac
+	else o=$A.com
+	fi
+done
+
+if test $o
+then	:
+else	echo >&2 "cc86: filename expected following -o"
+	exit 1
+fi
+
+if test x$C != x -o x$S != x -o x$P != x
+then	:
+else	oo=`basename $o .com`.ld
+	if ld86 -X -N -r -o $oo $LIB/$Y $Z $LIB/$LIBC &&\
+	   cvt86 $oo $o
+	then :
+	else rm -f $oo; exit 1
+	fi
+fi

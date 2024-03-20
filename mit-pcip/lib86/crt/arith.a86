@@ -1,0 +1,317 @@
+| 8087 based arithmetic support.
+
+	.text
+
+	.globl	fpinit
+fpinit:	finit			| initialize 8087 to known state
+	push	ax		| get of word of storage to play with
+	mov	bx,sp
+	fwait
+	fstcw	(bx)		| get control word so we can diddle bits
+	fwait
+	or	(bx),#0x0C00	| set rounding control to chop mode
+	fwait
+	fldcw	(bx)
+	fwait
+	pop	ax
+	ret
+
+|	double modf (value, iptr)
+|		double value;
+|		double *iptr;
+|
+|	Modf returns the fractional part of "value", and stores the integer
+|	part indirectly through "iptr".
+|
+
+	.globl	_modf
+_modf:	mov	bx,sp		| so we can address operands
+	fwait
+	fldd	*2(bx)		| get VALUE
+	fwait
+	fld	0		| and make a copy
+	fwait
+	frndint			| get integer part
+	mov	bx,*10(bx)	| get IPTR
+	fstd	(bx)		| and save integer part where ever it says
+	fwait
+	fsubrp	1,0		| now calculate fraction
+	fwait
+	fabs			| and make positive
+	ret			| fractional part returned as result
+
+|	double ldexp (value, exp)
+|		double value;
+|		int exp;
+|
+|	Ldexp returns value*2**exp, if that result is in range.
+|	If underflow occurs, it returns zero.  If overflow occurs,
+|	it returns a value of appropriate sign and largest
+|	possible magnitude.  In case of either overflow or underflow,
+|	the external int "errno" is set to ERANGE.  Note that errno is
+|	not modified if no error occurs, so if you intend to test it
+|	after you use ldexp, you had better set it to something
+|	other than ERANGE first (zero is a reasonable value to use).
+
+	erange = 34
+
+	.data
+	.globl	_errno		| error flag
+
+Lhuge:	.word	0xffff		| The largest number that can
+	.word	0xffff		|   be represented in a long floating
+	.word	0xffff		|   number.  This is given in hex in order
+	.word	0x7fff		|   to avoid floating conversions
+
+	.text
+	.globl	_ldexp
+
+_ldexp:	mov	bx,sp		| so we can address operands
+	mov	ax,*8(bx)	| get word containing exponent
+	movb	cl,*4		| shift and mask to get it
+	shr	ax,cl
+	and	ax,*0x7FF
+	jz	Ld1
+
+	add	ax,*10(bx)	| ax = new biased exponent
+	jle	Lunder		| if it's <= 0, we have an underflow
+	cmp	ax,#0x7FF	| otherwise check it it's too big
+	jg	Lover		| jump if overflow
+
+	shl	ax,cl		| shift exponent back to where it belongs
+	and	*8(bx),#0x800F	| get rid of old one
+	or	*8(bx),ax	| and install new
+	fldd	*2(bx)		| return resulting number as answer
+	fwait
+Ld1:	ret
+
+Lunder:	fldz			| Result is zero
+	j	Lerr		| Join general error code
+
+Lover:	fldd	Lhuge		| Largest possible floating magnitude
+	test	*8(bx),#0x8000	| make answer same sign as operand
+	jz	Lerr
+	fchs
+
+Lerr:	mov	_errno,#erange	| Indicate range error
+	ret
+
+| long arithmetic routines...  uses 8087.
+
+	.globl	lmul
+lmul:	mov	bx,sp
+	fwait
+	fldl	*2(bx)
+	fwait
+	fmull	*6(bx)
+	fwait
+	fstpl	*2(bx)
+	fwait
+	mov	ax,*2(bx)
+	mov	dx,*4(bx)
+	ret
+
+	.globl	ldiv
+ldiv:	mov	bx,sp
+	fwait
+	fldl	*2(bx)
+	fwait
+	fdivl	*6(bx)
+	fwait
+	fstpl	*2(bx)		| must be in chop mode
+	fwait
+	mov	ax,*2(bx)
+	mov	dx,*4(bx)
+	ret
+
+	.globl	lrem
+lrem:	mov	bx,sp
+	fwait
+	fldl	*6(bx)		| load divisor
+	fwait
+	fldl	*2(bx)		| load dividend
+	fwait
+	fprem			| do it
+	fwait
+	fstpl	*2(bx)		| must be in chop mode
+	fwait
+	mov	ax,*2(bx)
+	mov	dx,*4(bx)
+	fstpl	*6(bx)		| pop other arg off 8087 stack ??
+	fwait
+	ret
+
+	.globl	alrem
+alrem:	mov	bx,sp
+	fwait
+	fldl	*4(bx)
+	mov	bx,*2(bx)
+	fwait
+	fldl	(bx)
+	fwait
+	fprem
+	fwait
+	fstpl	(bx)
+	fwait
+	mov	ax,(bx)
+	mov	dx,*2(bx)
+	mov	bx,sp		| hope nothing has changed
+	fstpl	*6(bx)		| pop top of 8087 stack
+	fwait
+	ret
+
+	.globl	almul
+almul:	mov	bx,sp
+	fwait
+	fldl	*4(bx)
+	mov	bx,*2(bx)
+	fwait
+	fmull	(bx)
+	fwait
+	fstpl	(bx)
+	fwait
+	mov	ax,(bx)
+	mov	dx,*2(bx)
+	ret
+
+	.globl	aldiv
+aldiv:	mov	bx,sp
+	fwait
+	fldl	*4(bx)
+	mov	bx,*2(bx)
+	fwait
+	fdivrl	(bx)
+	fwait
+	fstpl	(bx)
+	fwait
+	mov	ax,(bx)
+	mov	dx,*2(bx)
+	ret
+
+
+| hack uldiv routine (DG)
+| This bombs bx,cx,ax,dx	result in dx,ax
+
+	.globl	uldiv
+uldiv:	mov	bx,sp
+
+	mov	ax,*8(bx)	| Is divisor < 2 ** 16
+	cmp	ax,#0;
+	jne	4$
+	mov	ax,*4(bx)	| get high word of dividend
+	mov	dx,#0
+	div	*6(bx)		| divide high
+	mov	cx,ax		| store high quotient for a sec...
+	mov	ax,*2(bx)	| dx,ax = diviend low + remainder * 2^16
+	div	*6(bx)		| divide again 
+	mov	dx,cx		| restore quotient high
+	ret
+
+4$:	mov	cx,#0		| clear cx to hold count
+	mov	ax,*6(bx)
+	mov	dx,*8(bx)	| get divisor
+5$:	shr	dx,#1		| shift divisor until < 2^16
+	rcr	ax,#1
+	inc	cx
+	or	dx,dx		| are we there yet?
+	jne	5$		| No, try some more.
+	push	ax		| store divisor for a sec..
+	mov	ax,*2(bx)
+	mov	dx,*4(bx)	| shift dividend by same amount
+6$:	shr	dx,*1
+	rcr	ax,*1
+	dec	cx
+	or	cx,cx
+	jne	6$		| cx better be >0 to begin with
+	div	*-2(bx)		| divide by stacked divisor
+	add	sp,*2		| get rid of stacked divisor
+	push	ax		| save proposed quotient
+	push	bx		| we'll need it later
+	mov	dx,*0
+	push	dx
+	push	ax
+	push	*8(bx)
+	push	*6(bx)		| stack args for ulmul
+	call	lmul		| same as ulmul
+	add	sp,*8		| get rid of args
+	pop	bx		| restore bx
+
+	sub	ax,*2(bx)	| a lot of trouble to do long compares
+	sbb	dx,*4(bx)
+	cmp	dx,#0
+	jl	8$
+	jne	7$
+	or	ax,#0
+	jz	8$
+
+7$:	pop	ax
+	mov	dx,*0
+	sub	ax,*1
+	sbb	dx,*0
+	ret
+8$:	pop	ax
+	mov	dx,*0
+	ret
+
+
+| More long arithmetic routines for the 8086. Does not use the 8087.
+| These are two routines that are used by the compiler but were not in
+| Chris Terman's library.
+
+| Written June 1983 by David Bridgham
+
+	.text
+
+| Another cheapy. Calls ldiv and lmul  rem = dividend - dnd/dvsr * dvsr
+
+	.globl	ulrem
+ulrem:	mov	bx,sp
+	push	bx
+	push	*8(bx)
+	push	*6(bx)
+	push	*4(bx)
+	push	*2(bx)
+	call	uldiv
+	add	sp,*8		| clean up stack
+	pop	bx
+	push	bx		| bx gets creamed by ldiv and lmul
+	push	dx
+	push	ax
+	push	*8(bx)
+	push	*6(bx)
+	call	lmul
+	add	sp,*8
+	pop	bx
+	sub	ax,*2(bx)
+	sbb	dx,*4(bx)
+	neg	dx		| negate to get right sign
+	neg	ax
+	sbb	dx,*0
+	ret
+
+	.globl	auldiv
+auldiv:	push	bp		| This one is REALLY cheap! -SAW.
+	mov	bp,sp
+	push	bx
+
+	mov	bx,*4(bp)	| adr for result.
+	mov	ax,*6(bp)	| divisor.
+	mov	dx,*8(bp)
+
+	push	bx
+	push	dx
+	push	ax
+	push	*2(bx)
+	push	*0(bx)
+	call	uldiv
+	add	sp,*8
+	pop	bx
+
+	mov	*0(bx),ax
+	mov	*2(bx),dx
+
+	pop	bx
+	pop	bp
+
+	ret
+

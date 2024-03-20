@@ -1,0 +1,28 @@
+| value = rbyte(seg, offset)
+
+	.globl	_rbyte
+_rbyte:	mov	bx,sp
+	push	es
+	mov	ax,*2(bx)		| segment
+	mov	es,ax
+	mov	bx,*4(bx)		| offset
+	seg	es
+	mov	al,(bx)
+	pop	es
+	mov	ah,#0
+	ret
+
+| wbyte(value, seg, offset)
+
+	.globl	_wbyte
+_wbyte:	mov	bx,sp
+	push	es
+	mov	ax,*4(bx)		| seg
+	push	ax
+	mov	ax,*2(bx)		| value
+	mov	bx,*6(bx)		| offset
+	pop	es
+	seg	es
+	mov	(bx),al
+	pop	es
+	ret

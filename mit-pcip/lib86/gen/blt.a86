@@ -1,0 +1,47 @@
+|Block transfer subroutine: blt(destination, source, count), returns count
+
+	.globl	_blt
+	.text
+
+_blt:	push	bp
+	mov	bp,sp
+	push	si
+	push	di
+
+	cld
+	mov	di,*4(bp)	| destination
+	mov	si,*6(bp)	| source
+	mov	bx,*8(bp)	| count
+	or	bx,bx
+	jz	Ldone
+
+	cmp	si,di		| see what direction to use
+	jae	Lok		| no interference here!
+	lea	ax,(bx_si)	| end of source block
+	cmp	ax,di
+	jbe	Lok		| source and destination are disjoint
+	lea	si,*-2(bx_si)	| they overlap, so start at other end
+	lea	di,*-2(bx_di)
+	std
+	test	bx,*1		| using byte moves?
+	jz	Lok
+	inc	si		| then point to last byte
+	inc	di
+
+Lok:	mov	cx,bx		| set up count
+	test	bx,*1
+	jz	Lword
+	repz			| movb doesn't use "z" part!
+	movb
+	j	Ldone
+
+Lword:	shr	cx,*1		| change to word count
+	repz
+	movw
+
+Ldone:	cld			| direction control back to usual
+	mov	ax,bx		| return count
+	pop	di
+	pop	si
+	pop	bp
+	ret

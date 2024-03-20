@@ -1,0 +1,275 @@
+| Long arithmetic routines for 8086. Does not use 8087
+
+	.text
+
+	.globl	fpinit
+fpinit:	ret			| 8087 init. Dummy here for compatability
+
+
+| long arithmetic routines...  does not 8087.
+
+| This one should work for both lmul and ulmul 
+
+	.globl	lmul
+	.globl	ulmul
+ulmul:
+lmul:	mov	bx,sp
+	mov	ax,*2(bx)	| alow into acc
+	mul	*6(bx)		| alow * blow
+	push	dx		| push high
+	push	ax		| push low
+	mov	ax,*2(bx)	| load alow
+	mul	*8(bx)		| bhigh * alow
+	push	ax		| only save low half
+	mov	ax,*4(bx)	| load ahigh
+	mul	*6(bx)		| ahigh * blow
+	add	ax,*-2(bx)	| ahigh*blow + alow * bhigh
+	mov	dx,ax		| ax << 16
+	mov	ax,*-4(bx)	| low half of result
+	add	dx,*-6(bx)	| add high halves
+	add	sp,*6		| restore stack pointer
+	ret
+
+| This one is weird
+| This should work for almul and aulmul
+
+	.globl	almul
+almul:	mov	bx,sp
+	mov	bx,*2(bx)	| load ptr to arg in bx
+	push	*2(bx)		| push high
+	push	(bx)		| push low
+	mov	bx,sp		| I don't believe this
+	
+	mov	ax,(bx)		| alow into acc
+	mul	*8(bx)		| alow * blow
+	push	dx		| push high
+	push	ax		| push low
+	mov	ax,(bx)	 	| load alow
+	mul	*10(bx)		| bhigh * alow
+	push	ax		| only save low half
+	mov	ax,*2(bx)	| load ahigh
+	mul	*8(bx)		| ahigh * blow
+	add	ax,*-2(bx)	| ahigh*blow + alow * bhigh
+	mov	dx,ax		| ax << 16
+	mov	ax,*-4(bx)	| low half of result
+	add	dx,*-6(bx)	| add high halves
+	add	sp,*10		| restore stack pointer
+	mov 	bx,sp		| store result sp should be in right place
+	mov	bx,*2(bx)	| get pointer to result
+	mov	(bx),ax		| store low word
+	mov	*2(bx),dx	| store high word
+	ret
+
+
+| hack uldiv routine
+| This bombs bx,cx,ax,dx	result in dx,ax
+
+	.globl	uldiv
+uldiv:	mov	bx,sp
+
+	mov	ax,*8(bx)	| Is divisor < 2 ** 16
+	cmp	ax,#0;
+	jne	4$
+	mov	ax,*4(bx)	| get high word of dividend
+	mov	dx,#0
+	div	*6(bx)		| divide high
+	mov	cx,ax		| store high quotient for a sec...
+	mov	ax,*2(bx)	| dx,ax = diviend low + remainder * 2^16
+	div	*6(bx)		| divide again 
+	mov	dx,cx		| restore quotient high
+	ret
+
+4$:	mov	cx,#0		| clear cx to hold count
+	mov	ax,*6(bx)
+	mov	dx,*8(bx)	| get divisor
+5$:	shr	dx,#1		| shift divisor until < 2^16
+	rcr	ax,#1
+	inc	cx
+	or	dx,dx		| are we there yet?
+	jne	5$		| No, try some more.
+	push	ax		| store divisor for a sec..
+	mov	ax,*2(bx)
+	mov	dx,*4(bx)	| shift dividend by same amount
+6$:	shr	dx,*1
+	rcr	ax,*1
+	dec	cx
+	or	cx,cx
+	jne	6$		| cx better be >0 to begin with
+	div	*-2(bx)		| divide by stacked divisor
+	add	sp,*2		| get rid of stacked divisor
+	push	ax		| save proposed quotient
+	push	bx		| we'll need it later
+	mov	dx,*0
+	push	dx
+	push	ax
+	push	*8(bx)
+	push	*6(bx)		| stack args for ulmul
+	call	lmul		| same as ulmul
+	add	sp,*8		| get rid of args
+	pop	bx		| restore bx
+
+	sub	ax,*2(bx)	| a lot of trouble to do long compares
+	sbb	dx,*4(bx)
+	cmp	dx,#0
+	jl	8$
+	jne	7$
+	or	ax,#0
+	jz	8$
+
+7$:	pop	ax
+	mov	dx,*0
+	sub	ax,*1
+	sbb	dx,*0
+	ret
+8$:	pop	ax
+	mov	dx,*0
+	ret
+
+
+| A really cheap ldiv. I remember the sign, convert the args and call uldiv
+| Later I'll do it better (inline)
+
+	.globl	ldiv
+ldiv:	mov	bx,sp
+	mov	cx,*0		| clear cx to hold sign of result
+	push	bx		| for later
+	push	cx		| cx = *-4(bx)
+	mov	ax,*6(bx)	| get divisor
+	mov	dx,*8(bx)
+	cmp	dx,*0
+	jge	9$
+	inc	*-4(bx)		| remember one negation
+	neg	dx
+	neg	ax
+	sbb	dx,*0
+9$:	push	dx
+	push	ax
+	mov	ax,*2(bx)	| get dividend
+	mov	dx,*4(bx)
+	cmp	dx,*0
+	jge	10$
+	inc	*-4(bx)		| remember one negation
+	neg	dx
+	neg	ax
+	sbb	dx,*0
+10$:	push	dx
+	push	ax
+	call	uldiv
+	add	sp,*8
+	pop	cx
+	pop	bx		| clean up stack, restore bx,cx
+	and	cx,*1		| test sign
+	jz	11$		| result should be positive return
+	not	ax		| else negate result; ignore overflow issues
+	not	dx
+	add	ax,*1
+	adc	dx,*0
+11$:	ret
+
+| Another cheapy. Calls ldiv and lmul  rem = dividend - dnd/dvsr * dvsr
+
+	.globl	lrem
+lrem:	mov	bx,sp
+	push	bx
+	push	*8(bx)
+	push	*6(bx)
+	push	*4(bx)
+	push	*2(bx)
+	call	ldiv
+	add	sp,*8		| clean up stack
+	pop	bx
+	push	bx		| bx gets creamed by ldiv and lmul
+	push	dx
+	push	ax
+	push	*8(bx)
+	push	*6(bx)
+	call	lmul
+	add	sp,*8
+	pop	bx
+	sub	ax,*2(bx)
+	sbb	dx,*4(bx)
+	neg	dx		| negate to get right sign
+	neg	ax
+	sbb	dx,*0
+	ret
+
+| Another cheapy. Calls uldiv and ulmul  rem = dividend - dnd/dvsr * dvsr
+
+	.globl	ulrem
+ulrem:	mov	bx,sp
+	push	bx
+	push	*8(bx)
+	push	*6(bx)
+	push	*4(bx)
+	push	*2(bx)
+	call	uldiv
+	add	sp,*8		| clean up stack
+	pop	bx
+	push	bx		| bx gets creamed by ldiv and lmul
+	push	dx
+	push	ax
+	push	*8(bx)
+	push	*6(bx)
+	call	ulmul
+	add	sp,*8
+	pop	bx
+	sub	ax,*2(bx)
+	sbb	dx,*4(bx)
+	neg	dx		| negate to get right sign
+	neg	ax
+	sbb	dx,*0
+	ret
+
+	.globl	aldiv
+aldiv:	push	bp		| This one is REALLY cheap! -SAW.
+	mov	bp,sp
+	push	bx
+
+	mov	bx,*4(bp)	| adr for result.
+	mov	ax,*6(bp)	| divisor.
+	mov	dx,*8(bp)
+
+	push	bx
+	push	dx
+	push	ax
+	push	*2(bx)
+	push	*0(bx)
+	call	ldiv
+	add	sp,*8
+	pop	bx
+
+	mov	*0(bx),ax
+	mov	*2(bx),dx
+
+	pop	bx
+	pop	bp
+
+	ret
+
+	.globl	auldiv
+auldiv:	push	bp		| This one is REALLY cheap! -SAW.
+	mov	bp,sp
+	push	bx
+
+	mov	bx,*4(bp)	| adr for result.
+	mov	ax,*6(bp)	| divisor.
+	mov	dx,*8(bp)
+
+	push	bx
+	push	dx
+	push	ax
+	push	*2(bx)
+	push	*0(bx)
+	call	uldiv
+	add	sp,*8
+	pop	bx
+
+	mov	*0(bx),ax
+	mov	*2(bx),dx
+
+	pop	bx
+	pop	bp
+
+	ret
+
+
