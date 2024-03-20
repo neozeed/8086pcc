@@ -1,0 +1,15 @@
+These are missing from libc and preventing TREK from working:
+
+alarm
+atan2
+cos
+exp
+fabs
+log
+longjmp
+pause
+pow
+signal
+sin
+sqrt
+time
