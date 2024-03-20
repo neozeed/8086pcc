@@ -33,6 +33,7 @@ clean:
 	cd wpronet& nmake clean
 
 install:
+	copy em\libsup.a $(LIBDIR)
 	copy ether\libether.a $(LIBDIR)
 	copy internet\libip.a $(LIBDIR)
 	copy net\libnet.a $(LIBDIR)

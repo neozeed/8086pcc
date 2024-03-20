@@ -4,7 +4,12 @@
 
 #include	<notice.h>
 
+#if 0
+warning: old-fashioned initialization: use =
 FILE *stdin, *stdout, *stderr;
+#else
+FILE *mystdin, *mystdout, *mystderr;
+#endif
 
 /* this is a silly kluge to make sure that the new _wbyte will be linked in
 */
@@ -15,8 +20,13 @@ stinit() {
 	space_initialize(0);
 
 	scr_init();
-
+#if 0
 	stdin  = fdopen(0, "ra");
 	stdout = fdopen(1, "wa");
 	stderr = fdopen(2, "wa");
+#else
+	mystdin  = fdopen(0, "ra");
+	mystdout = fdopen(1, "wa");
+	mystderr = fdopen(2, "wa");
+#endif
 	}

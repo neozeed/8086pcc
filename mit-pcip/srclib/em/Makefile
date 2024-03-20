@@ -2,13 +2,13 @@ include ..\howto.mak
 
 ASMOBJ = alt.b curse.b em.b kh.b sh.b
 
-BROKEN = stinit.b
+BROKEN = 
 OBJECTS =	h19.b h19key.b h19line.b lint.b scr_close.b stdne.b supdup.b \
-	_wbyte.b _wbyte_sup.b
+	_wbyte.b _wbyte_sup.b stinit.b
 
 
-all:	$(OBJECTS) $(ASMOBJ)
-#	ar cr ..\libc.a $(OBJECTS) $(ASMOBJ)
+libsup.a:	$(OBJECTS) $(ASMOBJ)
+	ar cr libsup.a $(OBJECTS) $(ASMOBJ)
 
 
 alt.b:		alt.a86
@@ -29,3 +29,4 @@ sh.b:	sh.a86
 
 clean:
 	@del $(OBJECTS) $(ASMOBJ)
+	@del libsup.a
