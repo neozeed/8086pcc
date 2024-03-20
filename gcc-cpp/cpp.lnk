@@ -1,0 +1,6 @@
+cccp.obj version.obj cexp.obj
+cpp /NOIG /NOE
+nul.map
+..\..\lib2\libc.lib +
+..\..\lib2\os2386.lib
+nul.def;
