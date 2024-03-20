@@ -289,7 +289,7 @@ match( p, cookie ) NODE *p; {
 
 int rtyflg = 0;
 
-expand( p, cookie, cp ) register NODE *p;  register char *cp; {
+expand( p, cookie, cp ) NODE *p;  register char *cp; {
 	/* generate code by interpreting table entry */
 
 	CONSZ val;

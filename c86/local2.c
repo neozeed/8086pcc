@@ -201,12 +201,12 @@ zzzcode( p, c ) NODE *p; {
 	case 'e':	/* sign extend A1 from byte */
 		m = p->in.type;
 		if (getlr(p,'1')->tn.rval == AX) {
-		  printf("	cbw");
-		  if (m==LONG || m==ULONG) printf("; cwd");
+		  printf("	cbw\n");
+		  if (m==LONG || m==ULONG) printf("	cwd\n");
 		} else {
-		  expand(p, RNOP, "	mov	cx,*8\n	sal	A1,cl\n	sar	A1,cl");
+		  expand(p, RNOP, "	mov	cx,*8\n	sal	A1,cl\n	sar	A1,cl\n");
 		  if (m==LONG || m==ULONG)
-		    expand(p, RNOP, "; mov\tU1,*0\n\tor\tA1,A1\n\tjge\t.+4\n\tnot\tU1");
+		    expand(p, RNOP, "\tmov\tU1,*0\n\tor\tA1,A1\n\tjge\t.+4\n\tnot\tU1\n");
 		}		
 		return;
 
@@ -320,11 +320,9 @@ zzzcode( p, c ) NODE *p; {
 		}
 	}
 
-rmove( rt, rs, t )
-  TWORD t;
-  {	printf( "\tmov\t%s,%s\n", rnames[rt], rnames[rs] );
-	if (t == LONG)	printf( "\tmov\t%s,%s\n", rnames[rt+1], rnames[rs+1] );
-}
+rmove( rt, rs, t ) TWORD t; {
+	printf( "	%s	%s,%s\n", (t==FLOAT||t==DOUBLE)?"movf":"mov", rnames[rt], rnames[rs] );
+	}
 
 struct respref
 respref[] = {
@@ -459,13 +457,11 @@ upput( p ) NODE *p; {
 
 	case ICON:
 		/* addressable value of the constant */
-		if (p->tn.name[0] != '\0') printf("*0");
-		else {
-		  CONSZ save; /* print the high order value */
+		{ CONSZ save; /* print the high order value */
 		  save = p->tn.lval;
 		  p->tn.lval = ( p->tn.lval >> SZINT ) & BITMASK(SZINT);
 		  if (p->tn.name[0]!='\0' || p->tn.lval<-128 || p->tn.lval>127)
-		    printf( "#" );
+		  printf( "#" );
 		  acon( p );
 		  p->tn.lval = save;
 		}
@@ -549,10 +545,10 @@ acon( p ) register NODE *p; { /* print out a constant */
 		printf( CONFMT, p->tn.lval);
 		}
 	else if( p->tn.lval == 0 ) {	/* name only */
-		printf( "%.*s", NCHNAM, p->in.name );
+		printf( "%.8s", p->in.name );
 		}
 	else {				/* name + offset */
-		printf( "%.*s+", NCHNAM, p->in.name );
+		printf( "%.8s+", p->in.name );
 		printf( CONFMT, p->tn.lval );
 		}
 	}
@@ -588,13 +584,8 @@ popargs( size ) register size; {
 	/* pop arguments from stack */
 
 	toff -= size/2;
-	switch(size) {
-	  case 2:	printf("	pop	cx\n");
-	  case 0:	break;
-	  default:	printf( "	add	sp,%c%d\n",
-				size>127 ? '#':'*', size );
+	printf( "	add	sp,%c%d\n", size>127 ? '#':'*', size );
 	}
-}
 
 char *ccbranches[] = {
 	"	beq	L%d\n",
@@ -924,7 +915,7 @@ special( p, shape ) register NODE *p; {
 		break;
 
 	case SICON:
-		if( p->in.op == ICON && p->in.name[0]=='\0' && p->tn.lval>= -32768 && p->tn.lval <=32767 ) return( 1 );
+		if( p->in.op == ICON && p->in.name[0]=='\0' && p->tn.lval>= 0 && p->tn.lval <=32767 ) return( 1 );
 		break;
 
 	default:

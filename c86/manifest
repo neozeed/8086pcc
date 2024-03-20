@@ -246,7 +246,7 @@
 # endif
 # define SWITSZ 250 /* size of switch table */
 
-# define NCHNAM 32  /* number of characters in a name */
+# define NCHNAM 8  /* number of characters in a name */
 
 /*	common defined variables */
 

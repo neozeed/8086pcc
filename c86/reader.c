@@ -524,7 +524,7 @@ order(p,cook) NODE *p; {
 
 	case FORCE:
 		/* recurse, letting the work be done by rallo */
-		if ((p->in.left->in.type==DOUBLE||p->in.left->in.type==FLOAT) && p->in.left->in.su!=0)
+		if (p->in.left->in.type==DOUBLE && p->in.left->in.su!=0)
 		  order( p->in.left, INTEMP );
 		p = p->in.left;
 		cook = INTAREG;
@@ -573,13 +573,13 @@ order(p,cook) NODE *p; {
 			}
 
 	case UNARY MINUS:
-		order( p1, (p1->in.type==DOUBLE||p1->in.type==FLOAT) ? INTEMP : INTAREG );
+		order( p1, p1->in.type==DOUBLE ? INTEMP : INTAREG );
 		goto again;
 
 	case NAME:
 		/* all leaves end up here ... */
 		if( o == REG ) goto nomat;
-		order( p, (p->in.type==DOUBLE||p->in.type==FLOAT) ? INTEMP : INTAREG );
+		order( p, p->in.type==DOUBLE ? INTEMP : INTAREG );
 		goto again;
 
 	case INIT:
@@ -725,11 +725,6 @@ store( p ) register NODE *p; {
 	if( ty == LTYPE ) return;
 
 	switch( o ){
-
-	case ASG MUL:
-	case ASG DIV:
-	case ASG MOD:
-		return;
 
 	case UNARY CALL:
 	case UNARY FORTCALL:

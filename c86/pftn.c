@@ -46,7 +46,7 @@ defid( q, class )  NODE *q; {
 
 # ifndef BUG1
 	if( ddebug ){
-		printf( "defid( %.*s (%d), ", NCHNAM, p->sname, idp );
+		printf( "defid( %.8s (%d), ", p->sname, idp );
 		tprint( q->in.type );
 		printf( ", %s, (%d,%d) ), level %d\n", scnames(class), q->fn.cdim, q->fn.csiz, blevel );
 		}
@@ -78,7 +78,7 @@ defid( q, class )  NODE *q; {
 		if( blevel==1 && stp!=FARG ) switch( class ){
 
 		default:
-			if(!(class&FIELD)) uerror( "declared argument %.*s is missing", NCHNAM, p->sname );
+			if(!(class&FIELD)) uerror( "declared argument %.8s is missing", p->sname );
 		case MOS:
 		case STNAME:
 		case MOU:
@@ -255,7 +255,7 @@ defid( q, class )  NODE *q; {
 		p = &stab[idp];
 		goto enter;
 		}
-	uerror( "redeclaration of %.*s", NCHNAM, p->sname );
+	uerror( "redeclaration of %.8s", p->sname );
 	if( class==EXTDEF && ISFTN(type) ) curftn = idp;
 	return;
 
@@ -264,7 +264,7 @@ defid( q, class )  NODE *q; {
 # ifndef BUG1
 	if( ddebug ) printf( "	new entry made\n" );
 # endif
-	if( type == UNDEF ) uerror("void type for %.*s",NCHNAM,p->sname);
+	if( type == UNDEF ) uerror("void type for %.8s",p->sname);
 	p->stype = type;
 	p->sclass = class;
 	p->slevel = blevel;
@@ -397,7 +397,7 @@ dclargs(){
 		p = &stab[j];
 # ifndef BUG1
 		if( ddebug > 2 ){
-			printf("\t%.*s (%d) ",NCHNAM,p->sname, j);
+			printf("\t%.8s (%d) ",p->sname, j);
 			tprint(p->stype);
 			printf("\n");
 			}
@@ -520,7 +520,7 @@ dclstruct( oparam ){
 
 # ifndef BUG1
 	if( ddebug ){
-		printf( "dclstruct( %.*s ), szindex = %d\n", NCHNAM,(i>=0)? stab[i].sname : "??", szindex );
+		printf( "dclstruct( %.8s ), szindex = %d\n", (i>=0)? stab[i].sname : "??", szindex );
 		}
 # endif
 	temp = (instruct&INSTRUCT)?STRTY:((instruct&INUNION)?UNIONTY:ENUMTY);
@@ -549,7 +549,7 @@ dclstruct( oparam ){
 			sz = tsize( p->stype, p->dimoff, p->sizoff );
 			}
 		if( sz == 0 ){
-			uerror( "illegal zero sized structure member: %.*s", NCHNAM, p->sname );
+			uerror( "illegal zero sized structure member: %.8s", p->sname );
 			}
 		if( sz > strucoff ) strucoff = sz;  /* for use with unions */
 		SETOFF( al, sa );
@@ -585,7 +585,7 @@ dclstruct( oparam ){
 			dimtab[szindex],dimtab[szindex+1],dimtab[szindex+2],
 			dimtab[szindex+3] );
 		for( i = dimtab[szindex+1]; dimtab[i] >= 0; ++i ){
-			printf( "\tmember %.*s(%d)\n", NCHNAM, stab[dimtab[i]].sname, dimtab[i] );
+			printf( "\tmember %.8s(%d)\n", stab[dimtab[i]].sname, dimtab[i] );
 			}
 		}
 # endif
@@ -614,8 +614,8 @@ ftnarg( idn ) {
 		/* this parameter, entered at scan */
 		break;
 	case FARG:
-		uerror("redeclaration of formal parameter, %.*s",
-			NCHNAM, stab[idn].sname);
+		uerror("redeclaration of formal parameter, %.8s",
+			stab[idn].sname);
 		/* fall thru */
 	case FTN:
 		/* the name of this function matches parm */
@@ -1624,7 +1624,7 @@ lookup( name, s) char *name; {
 	/* compute initial hash index */
 # ifndef BUG1
 	if( ddebug > 2 ){
-		printf( "lookup( %.*s, %d ), stwart=%d, instruct=%d\n", NCHNAM, name, s, stwart, instruct );
+		printf( "lookup( %.8s, %d ), stwart=%d, instruct=%d\n", name, s, stwart, instruct );
 		}
 # endif
 
@@ -1633,8 +1633,9 @@ lookup( name, s) char *name; {
 		i = (i<<1)+*p;
 		if( ++j >= NCHNAM ) break;
 		}
+	/* this will not have overflowed, since NCHNAM is small relative to
+	/* the wordsize... */
 	i = i%SYMTSZ;
-	if (i < 0) i = -i;	/* in case hash overflowed */
 	sp = &stab[ii=i];
 
 	for(;;){ /* look for name */
@@ -1678,10 +1679,10 @@ checkst(lev){
 			q = &stab[j];
 			if( q->stype == UNDEF ||
 			    q->slevel <= p->slevel ){
-				cerror( "check error: %.*s", NCHNAM, q->sname );
+				cerror( "check error: %.8s", q->sname );
 				}
 			}
-		else if( p->slevel > lev ) cerror( "%.*s check at level %d", NCHNAM, p->sname, lev );
+		else if( p->slevel > lev ) cerror( "%.8s check at level %d", p->sname, lev );
 		}
 	}
 #endif
@@ -1734,12 +1735,12 @@ clearst( lev ){ /* clear entries of internal scope  from the symbol table */
 		if( p->slevel>lev ){ /* must clobber */
 			if( p->stype == UNDEF || ( p->sclass == ULABEL && lev < 2 ) ){
 				lineno = temp;
-				uerror( "%.*s undefined", NCHNAM, p->sname );
+				uerror( "%.8s undefined", p->sname );
 				}
 			else aocode(p);
 # ifndef BUG1
-			if (ddebug) printf("removing %*s from stab[ %d], flags %o level %d\n",
-				NCHNAM,p->sname,p-stab,p->sflags,p->slevel);
+			if (ddebug) printf("removing %8s from stab[ %d], flags %o level %d\n",
+				p->sname,p-stab,p->sflags,p->slevel);
 # endif
 			if( p->sflags & SHIDES ) unhide(p);
 			p->stype = TNULL;
@@ -1786,7 +1787,7 @@ hide( p ) register struct symtab *p; {
 	movestab( q, p );
 	p->sflags |= SHIDDEN;
 	q->sflags = (p->sflags&(SMOS|STAG)) | SHIDES;
-	if( hflag ) werror( "%.*s redefinition hides earlier one", NCHNAM, p->sname );
+	if( hflag ) werror( "%.8s redefinition hides earlier one", p->sname );
 # ifndef BUG1
 	if( ddebug ) printf( "	%d hidden in %d\n", p-stab, q-stab );
 # endif

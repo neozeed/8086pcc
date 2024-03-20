@@ -209,7 +209,7 @@ buildtree( o, l, r ) register NODE *l, *r; {
 		case NAME:
 			sp = &stab[idname];
 			if( sp->stype == UNDEF ){
-				uerror( "%.*s undefined", NCHNAM, sp->sname );
+				uerror( "%.8s undefined", sp->sname );
 				/* make p look reasonable */
 				p->in.type = p->fn.cdim = p->fn.csiz = INT;
 				p->tn.rval = idname;
@@ -278,8 +278,8 @@ buildtree( o, l, r ) register NODE *l, *r; {
 					memnam = stab[i].sname;
 # ifndef BUG1
 					if( ddebug>1 ){
-						printf("member %.*s==%.*s?\n",
-							NCHNAM, memnam, NCHNAM, tabnam);
+						printf("member %.8s==%.8s?\n",
+							memnam, tabnam);
 						}
 # endif
 					if( stab[memi].sflags & SNONUNIQ ){
@@ -294,8 +294,8 @@ buildtree( o, l, r ) register NODE *l, *r; {
 					next: continue;
 					}
 				if( memi < 0 )
-					uerror("illegal member use: %.*s",
-						NCHNAM, stab[i].sname);
+					uerror("illegal member use: %.8s",
+						stab[i].sname);
 				}
 			else {
 				register j;
@@ -307,7 +307,7 @@ buildtree( o, l, r ) register NODE *l, *r; {
 					}
 				else if( (j=l->fn.csiz+1)<0 ) cerror( "undefined structure or union" );
 				else if( !chkstr( i, dimtab[j], DECREF(l->in.type) ) ){
-					werror( "illegal member use: %.*s", NCHNAM, stab[i].sname );
+					werror( "illegal member use: %.8s", stab[i].sname );
 					}
 				}
 
@@ -487,7 +487,7 @@ chkstr( i, j, type ) TWORD type; {
 	extern int ddebug;
 
 # ifndef BUG1
-	if( ddebug > 1 ) printf( "chkstr( %.*s(%d), %d )\n", NCHNAM, stab[i].sname, i, j );
+	if( ddebug > 1 ) printf( "chkstr( %.8s(%d), %d )\n", stab[i].sname, i, j );
 # endif
 	if( (k = j) < 0 ) uerror( "undefined structure or union" );
 	else {
@@ -505,8 +505,8 @@ chkstr( i, j, type ) TWORD type; {
 				if( hflag && chkstr( i, dimtab[stab[kk].sizoff+1], stab[kk].stype ) ){
 					if( stab[kk].sname[0] == '$' ) return(0);  /* $FAKE */
 					werror(
-					"illegal member use: perhaps %.*s.%.*s?",
-					NCHNAM,stab[kk].sname, NCHNAM,stab[i].sname );
+					"illegal member use: perhaps %.8s.%.8s?",
+					stab[kk].sname, stab[i].sname );
 					return(1);
 					}
 				}

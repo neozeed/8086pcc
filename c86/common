@@ -4,7 +4,7 @@
 
 int nerrors = 0;  /* number of errors */
 
-extern unsigned int offsz;
+unsigned int offsz;
 
 unsigned caloff(){
 	register i;
@@ -23,20 +23,13 @@ unsigned caloff(){
 NODE *lastfree;  /* pointer to last free node; (for allocator) */
 
 	/* VARARGS1 */
-
-
-uerror( s, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9 )
- char *s; { /* nonfatal error message */
-
-	/* Modified 9/28/84 by JSP to correct non-printing bug... 	*/
-	/* an inelegant, but workable solution.				*/
-
+uerror( s, a ) char *s; { /* nonfatal error message */
 	/* the routine where is different for pass 1 and pass 2;
 	/*  it tells where the error took place */
 
 	++nerrors;
 	where('u');
-	fprintf( stderr, s, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9 );
+	fprintf( stderr, s, a );
 	fprintf( stderr, "\n" );
 	if( nerrors > 30 ) cerror( "too many errors");
 	}

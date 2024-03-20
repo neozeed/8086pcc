@@ -515,7 +515,7 @@ setbin( p ) register NODE *p; {
 			offstar( r->in.left );
 			return( 1 );  /* hopefully, it is addressable by now */
 			}
-		order( r, INAREG|INTAREG|INTEMP );  /* anything goes on rhs */
+		order( r, INTAREG|INTEMP );  /* anything goes on rhs */
 		return( 1 );
 		}
 	else {
@@ -712,11 +712,7 @@ genargs( p) register NODE *p; {
 			if( p->in.op != OREG ){
 				offstar( p->in.left );
 				canon( p );
-				if( p->in.op != OREG ){
-					offstar( p->in.left );
-					canon( p );
-					if( p->in.op != OREG ) cerror( "stuck starg" );
-					}
+				if( p->in.op != OREG ) cerror( "stuck starg" );
 				}
 			}
 
