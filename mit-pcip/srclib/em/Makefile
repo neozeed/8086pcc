@@ -1,15 +1,20 @@
 include ..\howto.mak
 
-ASMOBJ = alt.b curse.b em.b kh.b sh.b
 
-BROKEN = 
-OBJECTS =	h19.b h19key.b h19line.b lint.b scr_close.b stdne.b supdup.b \
-	_wbyte.b _wbyte_sup.b stinit.b
+H19OBJS = curse.b h19line.b em.b h19.b _wbyte.b h19key.b \
+        scr_close.b kh.b sh.b alt.b
 
+SUPOBJS = curse.b scr_close.b supdup.b _wbyte_sup.b kh.b sh.b
 
-libsup.a:	$(OBJECTS) $(ASMOBJ)
-	ar cr libsup.a $(OBJECTS) $(ASMOBJ)
+default: libh19.a libsup.a
 
+libh19.a:	$(H19OBJS)
+	ar cr libh19.a $(H19OBJS)
+	ranlib libh19.a
+
+libsup.a:	$(SUPOBJS)
+	ar cr libsup.a $(SUPOBJS)
+	ranlib libsup.a
 
 alt.b:		alt.a86
 		a86 alt
@@ -28,5 +33,5 @@ sh.b:	sh.a86
 
 
 clean:
-	@del $(OBJECTS) $(ASMOBJ)
-	@del libsup.a
+	@del $(H19OBJS) $(SUPOBJS)
+	@del libsup.a libh19.a
