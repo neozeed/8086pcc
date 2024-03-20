@@ -1,0 +1,55 @@
+.SUFFIXES: .c .a86 .b
+
+OBJ = ../../obj
+LIB = ../../lib
+INCLUDE = ../../include
+OBJS = telnet.b telnet2.b time.b tn.b tnscreen.b
+
+etn: ${OBJS}
+	cc86 -o etn tn.b telnet.b telnet2.b tnscreen.b time.b -ltftp \
+	-ltcp -ludp -lether -lnet -lip -ltask -lh19
+	setver86 etn.com 71
+
+ptn: ${OBJS}
+	cc86 -o ptn tn.b telnet.b telnet2.b tnscreen.b time.b -ltftp \
+	-ltcp -ludp -lv2 -lnet -lip -ltask -lh19
+	setver86 ptn.com 71
+
+stn: ${OBJS}
+	cc86 -o stn tn.b telnet.b telnet2.b tnscreen.b time.b -ltftp \
+	-ltcp -ludp -lserial -lnet -lip -ltask -lh19
+	setver86 stn.com 71
+
+${OBJS}: telnet.h
+
+tn.b telnet.b telnet2.b: ${INCLUDE}/custom.h
+
+tn.b telnet.b telnet2.b:  ${INCLUDE}/ip.h
+
+telnet.b: ${INCLUDE}/tftp.h ${INCLUDE}/em.h
+
+telnet2.b: ${INCLUDE}/em.h
+
+time.b: ${INCLUDE}/net.h ${INCLUDE}/timer.h ${INCLUDE}/stdio.h  \
+	${INCLUDE}/attrib.h
+
+tnscreen.b: ${INCLUDE}/ip.h ${INCLUDE}/attrib.h
+
+lint:
+	lint86 tn.c telnet.c telnet2.c 	tnscreen.c time.c -ltftp -ltcp \
+	-ludp -lether -lnet -lip -ltask -lh19 -lc
+	lint86 tn.c telnet.c telnet2.c 	tnscreen.c time.c -ltftp -ltcp \
+	-ludp -lserial -lnet -lip -ltask -lh19 -lc
+	lint86 tn.c telnet.c telnet2.c 	tnscreen.c time.c -ltftp -ltcp \
+	-ludp -lv2 -lnet -lip -ltask -lh19 -lc
+
+all: etn ptn stn
+
+install:
+	mv stn.com etn.com ptn.com ${OBJ}
+
+.c.b:
+	cc86 -DDEBUG -c $*.c
+
+.a86.b:
+	a86 $*

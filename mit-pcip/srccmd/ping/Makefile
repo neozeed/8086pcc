@@ -1,0 +1,43 @@
+include ..\howto.mak
+
+OBJ = ../../obj
+LIB = \pcc\lib
+INCLUDE = ../../include
+
+LIBS = -L$(LIB) -ludp -lether -lip -lnet -ltask -lh19 -lpc -lc
+
+eping: ping.b
+#	cc86 -o eping ping.b -ludp -lether -lip -lnet -ltask -lnc -lh19
+	$(LD) $(LDFLAGS) -o eping.out $(LIB)\crt0.b ping.b $(LIBS)
+	$(CVT) eping.out eping.com
+#	setver86 eping.com 50
+
+pping: ping.b
+#	cc86 -o pping ping.b -ludp -lv2 -lip -lnet -ltask -lnc -lh19
+	setver86 pping.com 50
+
+sping: ping.b
+#	cc86 -o sping ping.b -ludp -lserial -lip -lnet -ltask -lnc -lh19
+	setver86 sping.com 50
+
+ping.b: $(INCLUDE)/ip.h
+
+lint:
+	lint86 ping.c -ludp -lether -lip -lnet -ltask -lnc -lh19 -lnc
+	lint86 ping.c -ludp -lserial -lip -lnet -ltask -lnc -lh19 -lnc
+	lint86 ping.c -ludp -lv2 -lip -lnet -ltask -lnc -lh19 -lnc
+
+all: eping pping sping
+
+install:
+	mv eping.com sping.com pping.com $(OBJ)
+
+#.c.b:
+#	cc86 -c -DDEBUG $*.c
+
+.a86.b:
+	a86 $*
+
+
+clean:
+	@del *.b *.out *.com
