@@ -113,7 +113,7 @@ main(argc,argv)
 	 }
 
 
-	/* define _etext, _edata, and _end if user uses them */
+	/* define _etext, _edata, _data_seg, and _end if user uses them */
 	for (i = hdr.a_syms/sizeof(struct nlist), s = symtab; i--; s++)
 	  if (s->n_type == (N_UNDF|N_EXT)) {
 	    if (strcmp(s->n_un.n_name,"_etext") == 0) {
@@ -125,6 +125,9 @@ main(argc,argv)
 	    } else if (strcmp(s->n_un.n_name,"_end") == 0) {
 	      s->n_value = hdr.a_data + hdr.a_bss + DataOffset;
 	      s->n_type = N_BSS;
+	    } else if (strcmp(s->n_un.n_name,"_data_seg") == 0) {
+	      s->n_value = ((hdr.a_text + 15 + Offset) >> 4) & 0x0fff;
+	      s->n_type = N_DATA;
 	    }
 	  }
 
