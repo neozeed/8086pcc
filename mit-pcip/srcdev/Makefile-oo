@@ -1,0 +1,7 @@
+# make all the cmds
+
+SUBDIR= netdev
+
+all: ${SUBDIR}
+	for i in ${SUBDIR}; do \
+		(cd $$i; make all install); done

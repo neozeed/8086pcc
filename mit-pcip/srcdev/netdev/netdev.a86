@@ -1,0 +1,215 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+
+| netdev.a86
+|	12/30/83	John Romkey
+| device net: which allows the custom structure to be shared by all programs
+
+| device handler equates
+command	=	2
+status	=	3
+lastaddr =	14
+buffer	=	14
+count	=	18
+
+| custom structure equates
+ncbytes	=	310	| number of bytes in the customization structure
+cversion =	8	| custom structure version number
+defint	=	5	| default interrupt vector
+defchan	=	1	| default dma channel
+defwin	=	1000	| default telnet window size
+defbase = 	0x300	| default base i/o address
+deflowwin	=	200	| default telnet low window
+
+	.text
+	.even
+| first the dos special device header
+	.long	*-1
+	.word	0x8000
+	.word	netstrat
+	.word	netint
+	.ascii	"NETCUST "
+| and next our copy of the custom structure
+custom:
+	.long	0	| padding so that old programs won't get confused
+	.word	cversion	| custom structure version
+	.long	0	| time of last customization
+	.long	0	| date of last customization
+	.word	0	| baud rate
+	.word	0	| type of line driver
+	.word	0	| debugging messages
+	.word	240	| time zone offset
+	.asciz	"EDT"	| and a label for it
+	.word	0	| telnetish custom bits
+	.word	0	| routing option
+	.word	0	| ethernet address selection option
+	.zerow	3	| and room for the user specified ethernet address
+	.long	0	| my address
+	.long	0	| my log server
+	.long	0	| my default gateway
+	.long	0	| my cookie server
+	.long	0	| my print server
+	.long	0	| my *fill in your favorite formatter* server
+	.word	0	| number of time servers
+	.zerow	10	| my time servers
+	.word	0	| number of name servers
+	.zerow	10	| name server addresses
+	.zerow	25	| user name
+	.zerow	25	| office name
+	.zerow	10	| phone number
+	.zerow	9	| 3 ethernet addresses
+	.zerow	6	| and 3 ip addresses for the translation cache
+	.word	defint	| default interrupt vector
+	.word	defchan	| default dma channel
+	.word	defbase | default CSR base
+	.word	defwin	| default telnet window
+	.word	deflowwin	| default telnet low window
+	.zerow	10	| variables
+	.word	0	| other net interface user active flag
+	.word	1	| total number of net interfaces on the machine
+	.byte	67	| first RVD drive ('c')
+	.byte	0	| padding
+
+| functions which handle device calls
+funs:
+	.word	netinit
+	.word	foul
+	.word	foul
+	.word	foul
+	.word	netrd
+	.word	foul
+	.word	foul	| okay
+	.word	foul
+	.word	netwr
+	.word	netwr
+	.word	foul
+	.word	foul	| okay
+	.word	foul
+| the count used by read and write because FLAMING MSDOS only asks for a
+| single character from the driver each time!!!
+current:
+	.word	0
+| lastdone variable lets us check for transitions to reset current
+lastdone:
+	.word	0	| 0 means read, 1 means write
+
+wrcalled: .word 0
+written: .word 0
+fouled: .word 0
+
+| and that's it for the custom structure. Now here's the actual driver.
+| First handling the strategy call
+netstrat:
+	reti
+| and then handling the interrupt call
+netint:
+	push	ax
+	push	cx
+	push	dx
+	push	di
+	push	si
+	push	ds
+	push	es
+
+	seg	es
+	mov	al,*command(bx)
+	xor	ah,ah
+	add	ax,ax
+	mov	di,*funs
+	add	di,ax
+	jmp	@*0(di)
+
+| handle the read call
+netrd:
+	cmp	lastdone,*0
+	jz	rdstart
+	mov	lastdone,*0
+	mov	current,*0
+
+rdstart:
+	seg	es
+	mov	cx,*count(bx)
+	seg	es
+	les	di,*buffer(bx)
+	mov	ax,cs
+	mov	ds,ax
+	seg	cs
+	mov	si,current
+	cld
+	repnz
+	movb
+
+	seg	cs
+	mov	current,si
+	mov	ax,si
+	cmp	ax,*funs
+	jl	nordchange
+	xor	ax,ax
+	mov	current,ax	
+
+nordchange:
+	pop	es
+	push	es
+
+okay:
+	seg	es
+	mov	*status(bx),*0x0100
+
+done:	pop	es
+	pop	ds
+	pop	si
+	pop	di
+	pop	dx
+	pop	cx
+	pop	ax
+	reti
+
+| handle a write call
+netwr:
+	inc	wrcalled
+	cmp	lastdone,*1
+	jz	wrstart
+	mov	lastdone,*1
+	mov	current,*0
+wrstart:
+	seg	es
+	mov	cx,*count(bx)
+	add	written,cx
+	seg	es
+	lds	si,*buffer(bx)
+	mov	ax,cs
+	mov	es,ax
+	seg	cs
+	mov	di,current
+	cld
+	repnz
+	movb
+
+	seg	cs
+	mov	current,di
+	mov	ax,di
+	cmp	ax,*funs
+	jl	nowrchange
+	xor	ax,ax
+	mov	current,ax	
+
+nowrchange:
+	pop	es
+	push	es
+	jmp	okay
+
+foul:
+	inc	fouled
+	seg	es
+	mov	*status(bx),*0x8002
+	jmp	done
+
+netinit:
+	seg	es
+	mov	*lastaddr(bx),*_etext
+	seg	es
+	mov	*lastaddr+2(bx),cs
+	seg	es
+	mov	*status(bx),*0x0100
+	jmp done

@@ -1,0 +1,20 @@
+.SUFFIXES: .c .a86 .b
+
+LIB = ../../lib
+OBJ = ../../obj
+
+netdev: netdev.b
+	ld86 -X -N -r netdev.b
+	cvt86 -O0 a.out netdev.sys
+
+all: netdev
+
+install:
+	mv netdev.sys ${OBJ}
+
+
+.c.b:
+	cc86 -c $*.c
+
+.a86.b:
+	a86 $*
