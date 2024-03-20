@@ -1,0 +1,48 @@
+|Count subroutine calls during profiling
+
+|The basic idea here is a call of the form:
+|
+|	mov	bx,#LABEL
+|	call	mcount
+|	.data
+|LABEL:	.word	0
+|	.text
+|
+|which is generated automatically by the C compiler for each subroutine call.
+|The first time mcount is called, the contents of LABEL will be 0 so mcount
+|will allocate two words from its buffer like:
+|
+|struct
+|{
+|	char *fncptr;		/* ptr to subroutine */
+|	long fnccnt;		/* number of calls to this function */
+|};
+|
+|and fill int fncptr from the return pc, fill in LABEL with a ptr to
+|the newly allocated structure and bump the count.  On subsequent calls,
+|the contents of LABEL will be used to just bump the count.
+
+.globl	mcount
+.comm	cntbase,2
+
+mcount:	mov	ax,(bx)		| fetch contents of LABEL
+	or	ax,ax
+	jnz	L1		| something there
+	push	di
+	mov	di,cntbase	| ptr to next available cnt structure
+	add	cntbase,*4	| bump cntbase to followng structure
+	push	bx
+	mov	bx,sp
+	mov	ax,*4(bx)	| first store return addr as function pointer
+	stow
+	pop	bx		| put pointer to count into LABEL
+	mov	(bx),di
+	mov	(di),*1		| finally put initial count into structure
+	mov	*2(di),*0
+	pop	di
+	ret
+
+L1:	mov	bx,ax
+	add	(bx),*1		| bump the function count
+	adc	*2(bx),*0
+	ret

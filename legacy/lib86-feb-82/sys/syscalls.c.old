@@ -1,0 +1,360 @@
+#include <sgtty.h>
+
+/* system call writearounds for IBM DOS -- cjt & saw (1/82)		 */
+
+#define NFILE 10	/* number of fcb's to allocate */
+#define NDRIVE 2	/* number of disk drives supported */
+#define	RECSIZE	0x80		/* record size we use			*/
+
+struct _fcb {
+  char drive;		/* first part replicates IBM DOS file control block */
+  char filename[8];
+  char fileext[3];
+  int  curblock;
+  int  recsize;
+  long filesize;
+  int  date;
+  char system[10];
+  char currec;
+  char ranrec[4];
+
+  char type;		/* tells type of device this fcb is for */
+};
+
+
+
+/* various devices */
+#define F_FREE	0	/* this fcb is unallocated */
+#define F_FILE	1	/* disk file */
+#define F_USER	2	/* keyboard/display */
+#define F_TTY	3	/* asynchronous communications adapater */
+
+static struct _fcb files[NFILE];	/* array of fcb's */
+
+
+/* Store a long into ranrec of a fcb:				*/
+
+srec(f, what)
+ register struct _fcb *f;
+ long what;
+ {	register char *p = &(f->ranrec[0]);
+	*p++ = what; what >>= 8;
+	*p++ = what; what >>= 8;
+	*p++ = what; what >>= 8;
+	*p = what;
+ }
+
+/* Get the ranrec of f:						*/
+
+long grec(f)
+ register struct _fcb *f;
+ {	register char *p = &(f->ranrec[0]);
+	long what = 0;
+	p += 3;
+	what += *--p; what <<= 8;
+	what += *--p; what <<= 8;
+	what += *--p;
+	return what;
+ }
+
+
+/* initialize fcb structures */
+dos_ini()
+  {	register struct _fcb *f;
+
+	/* mark all the fcb's as ready for allocation */
+	for (f = files; f < &files[NFILE]; f++) f->type = F_FREE;
+
+	/* now set up default files */
+	files[0].type = F_USER;		/* standard input from keyboard */
+	files[1].type = F_USER;		/* standard output to display */
+	files[2].type = F_USER;		/* standard error to display */
+}
+
+int close(fid)
+ register int fid;
+ {	register struct _fcb *f;
+
+
+	if ((fid >= 0) && (fid < NFILE))
+	  switch ((f = &files[fid])->type) {
+
+	    case F_FILE:
+			 dos(0x10, f);
+
+	    case F_USER:
+	    case F_TTY:	
+			 f->type = F_FREE;
+			 return 0;
+
+	    case F_FREE: return -102;	/* closed file.			*/
+
+	    default:	 return(-1);
+	  }
+
+	return(-1);
+}
+
+
+int open(name,mode)
+  char *name;
+ {	int res;
+	res = _open(name, mode);
+	return res;
+ }
+
+int creat(name,mode)
+ char *name;
+ {	int fid = _open(name, 1);
+	return fid;
+ }
+
+
+/* Allocate an FCB, look for special devices:				*/
+
+int _open(name,mode)
+  char *name;
+  {	register struct _fcb *f;
+	int fid;
+
+	for (fid=0; fid < NFILE; fid++)
+		if ((f = &files[fid])->type == F_FREE) goto gotone;
+	return(-1);
+
+
+gotone:
+
+	if (strcmp(name,"tty:") == 0) f->type = F_TTY;
+	else if (strcmp(name,"crt:") == 0) f->type = F_USER;
+	else
+	 { if (!parsename(f,name)) return -1;
+
+	   f->currec = 0;		/* start at beginning of file */
+
+	   srec(f, 0L);
+	   f->curblock = 0;
+	   f->recsize = RECSIZE;
+	   f->filesize = 0;
+
+	   switch(mode)
+	    { case 0:	if ((0xFF & dos(0xF, f)) != 0)
+			 return -2;		/* Can't find file!	*/
+			else break;		/* All OK.		*/
+	      case 1:   if ((0xFF & dos(0x16, f)) != 0)
+			 return -3;		/* No room ???		*/
+			else break;
+	      default:	return -4;		/* No other modes.	*/
+	    }
+
+	   f->type = F_FILE;			/* Now, its in use!	*/
+
+	 }
+	return(fid);			/* return index for future use */
+ }
+
+int write(fid,buffer,nbytes)
+ register char *buffer;
+ {	register struct _fcb *f;
+
+
+	if ((fid >= 0) && (fid < NFILE))
+	  switch ((f = &files[fid])->type) {
+
+	    case F_USER: while (nbytes--) dos(2,*buffer++);
+			 return(0);
+
+	    case F_TTY:	 while (nbytes--) dos(4,*buffer++);
+			 return(0);
+
+	    case F_FILE: return _write(f, buffer, nbytes);
+
+	    case F_FREE: return -102;	/* closed file.			*/
+
+	    default:	 return(-1);
+	  }
+	return(-1);
+}
+
+
+/* write, for files:							*/
+
+_write(f, buffer, nbytes)
+ register char *buffer;
+ register struct _fcb *f;
+ {	int count = 0;		/* actual byte count.			*/
+
+	if (nbytes%(f->recsize))/* fast transfer?			*/
+	 return -31;		/* Nope, non-integral number of records!*/
+
+	while (nbytes>0)
+	 { dos(0x1A, buffer);	/* set transfer adr			*/
+	   buffer += f->recsize;
+	   switch (dos(0x22, f))	/* the write ...		*/
+		{
+			case 2: return -21;
+
+			case 1:	return -11;	/* error.		*/
+
+			case 0:	count += f->recsize;
+				nbytes -= f->recsize;
+				srec(f, (long) 1L+grec(f));
+				continue;
+		}
+	 }
+
+	return count;
+ }
+
+
+
+int read(fid,buffer,nbytes)
+ register char *buffer;
+ {	register struct _fcb *f;
+	register int count=0;
+
+
+	if ((fid >= 0) && (fid < NFILE))
+	  switch ((f = &files[fid])->type) {
+
+	    case F_USER: for (;nbytes--;count++) *buffer++ = dos(1);
+			 return(count);
+
+	    case F_TTY:	 for (;nbytes--;count++) *buffer++ = dos(3);
+			 return(count);
+
+	    case F_FILE: return _read(f, buffer, nbytes);
+
+	    case F_FREE: return -102;	/* closed file.			*/
+	    default:	 return(-100);	/* Bad file type.		*/
+	  }
+
+	return(-101);			/* bad fid			*/
+}
+
+_read(f, buffer, nbytes)
+ register char *buffer;
+ register struct _fcb *f;
+ {	int count = 0;		/* actual byte count.			*/
+	
+	if (nbytes%(f->recsize))/* fast transfer?			*/
+	 return -31;		/* Nope, non-integral number of records!*/
+
+	while (nbytes>0)
+	 { dos(0x1A, buffer);	/* set transfer adr			*/
+	   buffer += f->recsize;
+	   switch (dos(0x21, f))	/* the read ...			*/
+		{
+			case 2:	return -10;	/* error.		*/
+			case 0:	count += f->recsize;
+				nbytes -= f->recsize;
+				srec(f, (long) 1L+grec(f));
+				continue;
+			case 3:	count += f->recsize;	/* partial record. */
+				nbytes -= f->recsize;
+				srec(f, (long) 1L+grec(f));
+
+			case 1:	goto endfile;
+
+		}
+	 }
+endfile:
+	return count;
+ }
+
+
+int lseek(fid, offset, wh)
+ int fid, wh;
+ long offset;
+ {	register struct _fcb *f;
+	register int i;
+
+	if ((fid >= 0) && (fid < NFILE))
+	  switch ((f = &files[fid])->type) {
+
+	    case F_TTY:
+	    case F_USER: return -110;
+
+	    case F_FILE: i = (RECSIZE-1);
+			 if (offset & RECSIZE)
+			  { prints("Nonintegral lseek ignored.\r\n");
+			    return -111; }
+			 while (i) { i >>= 1; offset >>= 1; }
+			 i = offset;
+			 if (wh != 0)
+			  { prints("Nonzero whence arg to lseek.\r\n");
+			    return -112; }
+			 srec(f, (long) i);
+			 return 0;
+
+	    case F_FREE: return -102;	/* closed file.			*/
+	    default:	 return(-100);	/* Bad file type.		*/
+	  }
+
+	return(-101);			/* bad fid			*/
+}
+
+
+
+char *sbrk(incr)
+  {	char a[1];
+	extern char *_memtop;	/* current top of user data */
+	register char *p,*q;
+
+	q = _memtop;		/* answer if we succeed */
+	p = &q[(incr+1)&~1];	/* new top of user data */
+
+	/* allocation succeeds if we didn't wrap around, and if we
+	 * are still below stack.
+	 */
+	if (p >= _memtop && p < &a[-64]) {
+	  _memtop = p;
+	  return(q);
+	}
+
+	return((char *)-1);
+}
+
+ioctl(fid,request,argp)
+  {	register struct _fcb *f;
+
+	if (fid>=0 && fid<NFILE && (f = &files[fid])->type==F_USER &&
+	    request==TIOCGETP) return(0);
+	prints("***ioctl call ignored\r\n");
+	return(-1);
+}
+
+/* output messsage to console */
+prints(p)
+  register char *p;
+  {	while (*p) dos(2,*p++);
+}
+
+/* parse file name into fcb, return <>0 if successful */
+parsename(f,name)
+  struct _fcb *f;
+  char *name;
+  {	register char *p;
+	register int i;
+
+	/* make sure ':' only appears after one character drive name */
+	for(p = name; *p; p++) if (*p == ':') {
+	  if (name[1]==':' && (i = name[0] - 'a')>=0 && i<NDRIVE)
+	    { f->drive = i; name += 2; goto drive; }
+	  return(0);
+	}
+	f->drive = 0;		/* default drive code */
+
+drive:	for(p = f->filename, i = 0; i++ < 11; *p++ = ' ');
+
+	/* copy in file name */
+	for(p = f->filename, i = 0; *name && *name!='.'; *p++ = *name++)
+	  if (i++ == 8) return(0);	/* file name too long */
+
+	if (*name == '.') name++;	/* skip extension separator */
+
+	/* copy in file extension */
+	for(p = f->fileext, i = 0; *name; *p++ = *name++)
+	  if (i++ == 3) return(0);	/* extension too long */
+
+	return(1);
+}

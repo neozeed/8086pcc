@@ -1,0 +1,168 @@
+|| set up C routine as interrupt handler.
+
+|| the following should correspond to <int.h>
+||   struct Int {
+||	int intnumber;	/* which interrupt we're handling */
+||	int oldip,oldcs;  /* what used to be the vector */
+||	int ip;		/* points to user's interrupt routine */
+||	int arg;	/* argument to user's interrupt routine */
+||	int istack[100];  /* interrupt stack and handler routine */
+||   }
+
+|| handler(inumber,&foo,f,arg)
+||   int inumber;	/* what interrupt we want to handle */
+||   struct Int *foo;	/* user-supplied structure that we fill in */
+||   int (*f)();	/* interrupt routine */
+||   int arg;		/* what interrupt routine should be called with */
+
+inumber = 0		| offsets...
+oldip = inumber+2
+oldcs = oldip+2
+iip = oldcs+2
+arg = iip+2
+istack = arg+2
+estack = istack+198	| could be 200 but who can be sure...
+
+	.text
+	.globl	_handler
+_handler:
+	push	bp		| standard entry sequence
+	mov	bp,sp
+	push	si
+	push	di
+	push	es
+
+	mov	bx,*6(bp)	| this is our structure
+
+	lea	di,*istack(bx)	| where interrupt handler will go
+	mov	si,#proto	| prototype used for initialization
+	mov	cx,#psize+1	| how many words to move
+	shr	cx,*1
+	repz
+	movw			| copy the routine (es = ds by default)
+	mov	*istack+proto1(bx),bx	| save away address of structure
+	lea	ax,estack(bx)
+	mov	*istack+proto2(bx),ax	| save away start of interrupt stack
+	mov	*istack+proto3(bx),cs	| save away current cs
+
+	mov	ax,*4(bp)	| get interrupt number
+	sal	ax,*1		| convert into byte offset
+	sal	ax,*1
+	mov	*inumber(bx),ax	| save for later reference
+	mov	si,ax		| save as index
+
+	mov	ax,*8(bp)	| save address of user's interrupt routine
+	mov	*iip(bx),ax
+	mov	ax,*10(bp)	| also save argument
+	mov	*arg(bx),ax
+
+	xor	ax,ax		| make es point to interrupt area
+	mov	es,ax
+	cli			| no interrupts while installing handler!
+	seg	es		| get current interrupt ip
+	mov	ax,(si)	
+	mov	*oldip(bx),ax
+	seg	es
+	mov	ax,*2(si)
+	mov	*oldcs(bx),ax
+	lea	ax,*istack(bx)	| offset of our handler stub
+	seg	es
+	mov	(si),ax
+	mov	ax,ds		| structure is in data seg...
+	seg	es
+	mov	*2(si),ax
+	sti
+
+	pop	es
+	pop	si
+	pop	di
+	pop	bp
+	ret
+
+|| nohandler(foo)
+||   struct Int *foo;	/* previous prepared interrupt structure */
+
+	.globl	_nohandler
+	.globl	_nohandl	| C-compiler truncates names
+_nohandler:
+_nohandl:
+	push	bp
+	mov	bp,sp
+	push	si
+	push	di
+	push	es
+
+	mov	bx,*4(bp)	| this is our structure
+	xor	ax,ax		| make es point to interrupt area
+	mov	es,ax
+	mov	si,*inumber(bx)
+
+	cli
+	mov	ax,*oldip(bx)	| restore old interrupt handler
+	seg	es
+	mov	(si),ax
+	mov	ax,*oldcs(bx)
+	seg	es
+	mov	*2(si),ax
+	sti
+
+	pop	es
+	pop	di
+	pop	si
+	pop	bp
+	ret
+
+|| this general-purpose stub is called by tailored interrupt routines
+|| so that cs gets set up correctly for c environment.
+||	bx -> interrupt structure
+
+stub:	push	ax		| save rest of registers
+	push	dx
+	push	cx
+	push	ds
+	push	es
+
+	mov	ax,ss		| set up remainder of segment registers
+	mov	ds,ax
+	mov	es,ax
+
+	push	*arg(bx)	| get ready to call user's routine
+	call	@*iip(bx)	| let user do his thing
+	add	sp,*2
+
+	pop	es
+	pop	ds
+	pop	cx
+	pop	dx
+	pop	ax
+	reti			| back to interrupt routine
+
+	.data
+|| prototype interrupt handler...  copied into interrupt structure where it
+|| will be able to find the info it needs to call user's interrupt routine.
+
+proto:	push	bx		| save what we need to get started
+	push	di
+	push	si
+	mov	di,ss		| di and si will be used to save old stack info
+	mov	si,sp
+
+	mov	bx,cs		| set up stack for c environment
+	mov	ss,bx
+proto1 = . - proto + 1		| where we should stick address of interrupt struct
+	mov	bx,#0		| get address of interrupt struct
+proto2 = . - proto + 1
+	mov	sp,#0		| and set up to use interrupt stack
+
+proto3 = . - proto + 3		| where c-environments cs will go
+	calli	stub,0		| make interseg call to do the rest
+
+	mov	sp,si		| get back the old stack
+	mov	ss,di
+	pop	si		| restore saved regs
+	pop	di
+	pop	bx
+	iret			| return from interrupt
+
+psize = . - proto		| size of user-specific interrupt code
+

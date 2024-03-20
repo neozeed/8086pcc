@@ -1,0 +1,47 @@
+|setjmp, longjmp
+|
+|	longjmp(a, v)
+|causes a "return(v)" from the
+|last call to
+|
+|	setjmp(v)
+|by restoring all the registers and
+|adjusting the stack
+|
+|jmp_buf is set up as:
+|
+|	_________________
+|	|	pc	|
+|	-----------------
+|	|	sp	|
+|	-----------------
+|	|	di	|
+|	-----------------
+|	|	si	|
+|	-----------------
+
+	.globl _setjmp, _longjmp
+	.text
+
+_setjmp:
+	mov	bx,sp
+	mov	ax,(bx)		| pc
+	mov	bx,*2(bx)	| address of jmp_buf
+	mov	(bx),ax		| fill buffer...
+	mov	*2(bx),sp
+	mov	*4(bx),di
+	mov	*6(bx),si
+	mov	ax,*0		| return 0...
+	ret
+
+longjmp:
+	mov	bx,sp
+	mov	ax,*4(bx)	| value to be returned
+	mov	bx,*2(bx)	| pointer to jmp_buf
+	mov	si,*6(bx)
+	mov	di,*4(bx)
+	mov	sp,*2(bx)	| reset stack
+	mov	cx,(bx)		| old return pc
+	mov	bx,sp		| which we'll reuse
+	mov	(bx),cx
+	ret

@@ -1,0 +1,141 @@
+1c1
+< # include <stdio.h>
+---
+> #include <stdio.h>
+6,11c6,14
+< register FILE *file;
+< {	register char c, *p, *q;
+< 	register int d, width, ndigit, radix;
+< 	register unsigned n;
+< 	char t[128], digits[10], zfill, rjust, ndfnd;
+< 	struct {
+---
+> FILE *file;
+> {
+> 	register char *p, *q;
+> 	unsigned int n;
+> 	int d, radix, ndigit, width, sign, decpt;
+> 	char t[128], digits[10], zfill, rjust, ndfnd, c;
+> 	char *ecvt(), *fcvt();
+> 	struct
+> 	{
+16a20
+> 
+33c37
+< 			if (*fmt == '0') {
+---
+> 			if (*fmt == '0')
+34a39,40
+> 			if (*fmt == '*') {
+> 				width = *argp++;
+36,37c42
+< 			}
+< 			if(*fmt != '*') { 
+---
+> 			} else {
+42,46d46
+< 			else {
+< 				fmt++;
+< 				d = *fmt++ - '0';
+< 				width = *argp++;
+< 			}
+49,51c49
+< 			    if(*fmt != '*') {
+< 				ndigit = 0;
+< 				while ((d = *fmt++ - '0') >= 0 && d <= 9) {
+---
+> 				if (*fmt == '*') {
+53c51,59
+< 					ndigit = ndigit*10+d;
+---
+> 					ndigit = *argp++;
+> 					fmt++;
+> 				} else {
+> 					ndigit = 0;
+> 					while ((d = *fmt++ - '0') >= 0 && d <= 9) {
+> 						ndfnd++;
+> 						ndigit = ndigit*10+d;
+> 					}
+> 					d += '0';
+55,62d60
+< 				d += '0';
+< 			    }
+< 			    else {
+< 				fmt++;
+< 				d = *fmt++;
+< 				ndfnd++;
+< 				ndigit = *argp++;
+< 			    }
+104,108c102,103
+< 				for (q = &digits[0]; n != 0; n = n/radix)
+< 				{
+< 					d = n%radix;
+< 					*q++ = d + (d<10?'0':'a'-10);
+< 				}
+---
+> 				for (q = &digits[0]; n != 0; n /= radix)
+> 					*q++ = (d = n%radix) + (d<10?'0':'a'-10);
+138,140c133,191
+< 			case '%':
+< 				*p++= '%';
+< 				break;
+---
+> 
+> 			case 'f':
+> 				if (ndfnd == 0)
+> 					ndigit = 6;
+> 				q = fcvt(*((double *)argp), ndigit,
+> 					&decpt, &sign); argp += 2;
+> 				if (sign)
+> 					*p++ = '-';
+> 				if ((d = decpt) <= 0)
+> 					*p++ = '0';
+> 				else do {
+> 						*p++ = *q++;
+> 					} while (--d > 0);
+> 				if (d = ndigit)
+> 					*p++ = '.';
+> 				if ((decpt = - decpt) > 0)
+> 					while (--d >= 0) {
+> 						*p++ = '0';
+> 						if (--decpt < 0)
+> 							break;
+> 					}
+> 				if (d > 0)
+> 					while (--d >= 0)
+> 						*p++ = *q++;
+> 				goto prbuf;
+> 
+> 			case 'e':
+> 				if (ndfnd == 0)
+> 					ndigit = 6;
+> 				else
+> 					ndigit += 1;
+> 				q = ecvt(*((double *)argp), ndigit,
+> 					&decpt, &sign); argp += 2;
+> 				if (sign)
+> 					*p++ = '-';
+> 				if (*q == '0')
+> 					decpt += 1;
+> 				*p++ = *q++;
+> 				*p++ = '.';
+> 				for (d = ndigit; --d > 0; *p++ = *q++);
+> 				*p++ = 'e';
+> 				decpt -= 1;
+> 				if (decpt >= 0)
+> 					*p++ = '+';
+> 				else {
+> 					*p++ = '-';
+> 					decpt = -decpt;
+> 				}
+> 				*p++ = (unsigned)decpt/10+'0';
+> 				*p++ = (unsigned)decpt%10+'0';
+> 				goto prbuf;
+> 
+> 			case 'g':
+> 				if (ndfnd == 0)
+> 					ndigit = 6;
+> 				gcvt(*((double *)argp), ndigit, p); argp +=2;
+> 				while (*p++ != 0);
+> 				p -= 1;
+> 				goto prbuf;

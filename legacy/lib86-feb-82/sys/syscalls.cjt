@@ -1,0 +1,170 @@
+#include <sgtty.h>
+/* system call writearounds for IBM DOS -- cjt (1/82) */
+
+#define NFILE 10	/* number of fcb's to allocate */
+#define NDRIVE 2	/* number of disk drives supported */
+
+struct _fcb {
+  char drive;		/* first part replicates IBM DOS file control block */
+  char filename[8];
+  char fileext[3];
+  char xcurblock[2];	/* use char so alignment is correct */
+  char xrecsize[2];
+  char xfilesize[4];
+  char xdate[2];
+  char system[10];
+  char currec;
+  char xranrec[4];
+
+  char type;		/* tells type of device this fcb is for */
+};
+
+/* these macros access the elements above as shorts, longs, ... */
+#define curblock(f) (*(short *)(&(f)->xcurblock[0]))
+#define recsize(f) (*(short *)(&(f)->xrecsize[0]))
+#define filesize(f) (*(long *)(&(f)->xfilesize[0]))
+#define date(f) (*(short *)(&(f)->xdate[0]))
+#define ranrec(f) (*(short *)(&(f)->xranrec[0]))
+
+/* various devices */
+#define F_FREE	0	/* this fcb is unallocated */
+#define F_FILE	1	/* disk file */
+#define F_USER	2	/* keyboard/display */
+#define F_TTY	3	/* asynchronous communications adapater */
+
+static struct _fcb files[NFILE];	/* array of fcb's */
+
+/* initialize fcb structures */
+dos_ini()
+  {	register struct _fcb *f;
+
+	/* mark all the fcb's as ready for allocation */
+	for (f = files; f < &files[NFILE]; f++) f->type = F_FREE;
+
+	/* now set up default files */
+	files[0].type = F_USER;		/* standard input from keyboard */
+	files[1].type = F_USER;		/* standard output to display */
+	files[2].type = F_USER;		/* standard error to display */
+}
+
+int close(fid)
+  register int fid;
+  {	register struct _fcb *f;
+
+	if (fid>=0 && fid<NFILE && (f = &files[fid])->type!=F_FREE) {
+	  if (f->type == F_FILE) dos(10,f);
+	  f->type = F_FREE;
+	  return(0);
+	}
+	return(-1);
+}
+
+int open(name,mode)
+  char *name;
+  {	return( _open(name,0xF) );
+}
+
+int creat(name,mode)
+  char *name;
+  {	return( _open(name,0x16) );
+}
+
+int _open(name,mode)
+  char *name;
+  {	register struct _fcb *f;
+
+	for (f = files; f < &files[NFILE]; f++) if (f->type == F_FREE) goto gotone;
+	return(-1);
+
+gotone:	if (strcmp(name,"tty:") == 0) f->type = F_TTY;
+	else if (strcmp(name,"crt:") == 0) f->type = F_USER;
+	else {
+	  if (!parsename(f,name) || dos(mode,f)==-1) return(-1);
+	  f->type = F_FILE;
+	  f->currec = 0;		/* start at beginning of file */
+	  ranrec(f) = 0;
+	}
+
+	return(f - files);		/* return index for future use */
+}
+
+int write(fid,buffer,nbytes)
+  register char *buffer;
+  {	register struct _fcb *f;
+
+	if (fid>=0 && fid<NFILE && (f = &files[fid])->type!=F_FREE)
+	  switch (f->type) {
+	    case F_USER: while (nbytes--) dos(2,*buffer++);
+			 return(0);
+
+	    case F_TTY:	 while (nbytes--) dos(4,*buffer++);
+			 return(0);
+
+	    default:	 return(-1);
+	  }
+	return(-1);
+}
+
+char *sbrk(incr)
+  {	char a[1];
+	extern char *_memtop;	/* current top of user data */
+	register char *p,*q;
+
+	q = _memtop;		/* answer if we succeed */
+	p = &q[(incr+1)&~1];	/* new top of user data */
+
+	/* allocation succeeds if we didn't wrap around, and if we
+	 * are still below stack.
+	 */
+	if (p > _memtop && p < &a[-64]) {
+	  _memtop = p;
+	  return(q);
+	}
+
+	return((char *)-1);
+}
+
+ioctl(fid,request,argp)
+  {	register struct _fcb *f;
+
+	if (fid>=0 && fid<NFILE && (f = &files[fid])->type==F_USER &&
+	    request==TIOCGETP) return(0);
+	prints("***ioctl call ignored\r\n");
+	return(-1);
+}
+
+/* output messsage to console */
+prints(p)
+  register char *p;
+  {	while (*p) dos(2,*p++);
+}
+
+/* parse file name into fcb, return <>0 if successful */
+parsename(f,name)
+  struct _fcb *f;
+  char *name;
+  {	register char *p;
+	register int i;
+
+	/* make sure ':' only appears after one character drive name */
+	for(p = name; *p; p++) if (*p == ':') {
+	  if (name[1]==':' && (i = name[0] - 'a')>=0 && i<NDRIVE)
+	    { f->drive = i; name += 2; goto drive; }
+	  return(0);
+	}
+	f->drive = 0;		/* default drive code */
+
+drive:	for(p = f->filename, i = 0; i++ < 11; *p++ = ' ');
+
+	/* copy in file name */
+	for(p = f->filename, i = 0; *name && *name!='.'; *p++ = *name++)
+	  if (i++ == 8) return(0);	/* file name too long */
+
+	if (*name == '.') name++;	/* skip extension separator */
+
+	/* copy in file extension */
+	for(p = f->fileext, i = 0; *name; *p++ = *name++)
+	  if (i++ == 3) return(0);	/* extension too long */
+
+	return(1);
+}

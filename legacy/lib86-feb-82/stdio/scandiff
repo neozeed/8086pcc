@@ -1,0 +1,12 @@
+180c180
+< /*
+---
+> 
+187c187
+< 		**(double **)ptr = atof(numbuf);
+---
+> 		*(*((double **)ptr)) = atof(numbuf);
+189c189
+< */
+---
+> 

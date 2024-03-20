@@ -1,0 +1,22 @@
+|| IBM DOS interface (1/82)
+
+|| int dos(index,arg) -- make DOS call specified by index with argument arg.
+
+	.globl	_dos
+
+	.text
+_dos:	push	bp		| entry sequence
+	mov	bp,sp
+	push	di
+	push	si
+
+	movb	ah,*4(bp)	| get index into AH
+	mov	dx,*6(bp)	| argument pointer into DX
+	int	0x21		| let operating system do what it will
+	movb	ah,*0		| zero extend answer to make an int result
+
+	lea	sp,*-4(bp)
+	pop	si
+	pop	di
+	pop	bp
+	ret
