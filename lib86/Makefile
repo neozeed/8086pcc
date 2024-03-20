@@ -1,5 +1,5 @@
 
-all: libc.a crt0.b
+all: libc.a nlibc.a crt0.b
 
 libc.a:
 	cd crt& nmake
@@ -10,7 +10,7 @@ libc.a:
 
 nlibc.a:
 	cd ncrt& nmake
-	cd sys& nmake
+	cd nsys& nmake
 	cd ngen& nmake
 	cd nstdio& nmake
 	ranlib nlibc.a
@@ -25,4 +25,9 @@ clean:
 	cd sys& nmake clean
 	cd gen& nmake clean
 	cd stdio& nmake clean
-	@del libc.a crt0.b
+	cd ncrt& nmake clean
+	cd nsys& nmake clean
+	cd ngen& nmake clean
+	cd nstdio& nmake clean
+
+	@del libc.a nlibc.a crt0.b
