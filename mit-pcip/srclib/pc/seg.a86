@@ -1,0 +1,14 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+
+	.globl	_get_ds
+	.globl	_get_cs
+
+_get_ds:
+	mov	ax,ds
+	ret
+
+_get_cs:
+	mov	ax,cs
+	ret

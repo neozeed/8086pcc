@@ -1,0 +1,5 @@
+There are actually two ethernet libraries, libether.a and libwether.a. The
+former is the normal ethernet driver while the latter is for use with
+netwatch. The Makefile will construct them both; conditional compilation is
+used to share most of the code. The Makefile is somewhat awkward because of
+a problem we ran into with make.

@@ -1,0 +1,31 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+
+
+| Stupid dos 2.0...this is the last crock I'll write to sidestep its many
+| and splendid "features."
+
+	.globl	_mkraw
+_mkraw:
+	push	bp
+	mov	bp,sp
+	push	si
+	push	di
+
+	mov	bx,*4(bp)
+	mov	ax,*0x4400
+	int	0x21
+
+	mov	dh,*0
+	or	dl,*0x20
+	mov	ax,*0x4401
+	mov	bx,*4(bp)
+	int	0x21
+
+	pop	di
+	pop	si
+	pop	bp
+	ret
+
+

@@ -1,0 +1,19 @@
+.SUFFIXES: .c .a86 .b
+
+LIB = ../../lib
+
+OBJS = tftp_use.b tftp_srv.b tftp_util.b
+
+libtftp: ${OBJS}
+	ar r ${LIB}/libtftp.a ${OBJS}
+	ranlib ${LIB}/libtftp.a
+
+lintlib:
+	lint86 -Ctftp tftp_use.c tftp_srv.c tftp_util.c
+	mv llib-ltftp.ln ${LIB}
+
+.c.b:
+	cc86 -c -DDEBUG $*.c
+
+.a86.b:
+	a86 $*

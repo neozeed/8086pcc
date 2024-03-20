@@ -1,0 +1,233 @@
+| C startup routine for IBM DOS
+| Non-8087 version
+| Modified for MSDOS 2.0, 6/26/83 SAW
+| Modified again, 9/7/84 PZ + SAW
+
+| proper operation requires that this be linked as first file.
+
+	.globl	_main		| user program
+	.globl	__bomb		| jmp here when stack and data overlap
+	.globl	__memtop	| current top of user data
+	.globl	__stdi		| file names, for i/o redirection (used
+	.globl	__stdo		|  by dos_ini, if nonzer)
+	.globl	__stde
+
+	.globl	__exit		| exit code
+	.globl	_etext		| end of text segment
+	.globl	_edata		| end of data segment
+	.globl	_end		| end of bss segment
+	.globl	fpinit		| 8087 initialization
+	.globl	_dos_ini	| system call writearound initialization
+	.globl	_prints		| trivial string i/o for messages
+	.globl	_version
+qmark = 077	| question mark character
+space = 040	| space character
+grt	= 62	| greater than
+lt	= 60	| less than
+and	= 38	| ampersand
+
+| format of memory:
+|	---------------  <- 0x0 (CS, plus on entry DS, ES, SS)
+|	 DOS Interface
+|	---------------  <- 0x100
+|	     code
+|	---------------  <- mod 16 boundary (after setup: DS, ES, SS)
+|	   data,bss
+|
+|
+|
+|	    stack
+|	---------------  <- min(base of data + 64K, top of memory)
+
+	.data
+	.even
+_version:
+	.zerow	1
+
+	.text
+|| set up segment registers and stack pointer
+	jmp	crtstart
+version:
+	.word	0
+
+crtstart:
+	cli			| turn off interupts until segment hacking complete
+	mov	ax,#_etext+15	| top of program segment
+	movb	cl,*4		| convert into segment value
+	shr	ax,cl
+	mov	bx,cs		| now add in base of "instruction space"
+	add	ax,bx
+	mov	es,ax		| set up "data space" segment regs
+	mov	ss,ax		| we'll do DS after copying JCL
+
+	mov	sp,*0		| start stack at top of "data space"
+	mov	bx,0x2		| see how big memory is... (in 16 byte hunks)
+	sub	bx,ax		| calculate how much is available for data space
+	cmp	bx,#0x1000	| if larger than 64K, sp is set correctly
+	jae	spok
+	shl	bx,cl		| if smaller, convert what we have into offset
+	mov	sp,bx		| and use that as top of stack
+spok:	sti
+
+| Now SP and SS have their final values... compute total size, in pp, to
+|   tell DOS how much we're using:
+	mov	ax,sp
+	shr	ax,cl		| data seg size, in pp.
+	jne	spnz
+	mov	ax,#0x1000
+spnz:	mov	cx,ss
+	add	ax,cx		| pp ptr beyond data segment.
+	mov	cx,cs
+	sub	ax,cx		| Total size, in pp, of whole shebang.
+	push	es
+	push	cs
+	pop	es		| set es to base for DOS call
+	mov	bx,ax
+	mov	ah,#0x4A	| SETBLOCK dos call
+	int	0x21
+	pop	es
+
+|| create argc and argv from JCL provided by DOS.
+	cld
+	mov	si,#0x80	| start of JCL string
+	lodb			| AL gets string length
+	movb	cl,al		| make it into full word => CX
+	movb	ch,*0
+
+	sub	sp,*3		| reserve space for "?" + nulls
+	sub	sp,cx		| space for JCL string
+	and	sp,*0xFFFE	| word align stack for 8086...
+
+	mov	di,sp		| argv[0] = "?"
+	movb	al,*qmark
+	stob
+	movb	al,*0
+	stob
+
+	movb	bl,*1		| temporary copy of argc
+	movb	bh,*0		| last character seen
+
+	jcxz	aend		| if (length(JCL) == 0) punt following code
+
+aloop:	lodb			| get next character from jcl
+	cmpb	al,*space	| spacing chars mark end of current token
+	jg	L1
+	movb	al,*0		| change spacing chars into nulls
+	cmpb	bh,*0		| incr argc (bl) if last char was end of token 
+	je	L1
+	incb	bl
+L1:	stob			| save next character into argv
+	movb	bh,al		| keep track of last character read
+	loop	aloop		| run through all the characters
+
+aend:	movb	al,*0		| finish last element of argv with a null
+	stob
+	cmp	bh,*0		| and bump argc if appropriate
+	je	L2
+	incb	bl
+
+L2:	mov	cx,es		| make data segment point to real data segment
+	mov	ds,cx
+	mov	si,sp		| SI = beginning of argv datum
+	mov	cl,bl		| CX = argc
+	mov	ch,*0
+	sub	sp,cx		| allocate space for argv vector
+	sub	sp,cx		| remember to allocate words!
+
+	mov	di,sp		| DI = &argv[0]
+	mov	dx,*-1		| will be used for count below
+	j	L4
+
+L3:	movb	al,*0		| set up to use scab to search for nulls
+	xchg	si,di		| get pointers into correct regs
+	xchg	cx,dx
+
+	repnz			| else, its a standard arg.
+	scab			| skip over first token
+	repz
+	scab			| skip over nulls
+	xchg	cx,dx
+	xchg	si,di
+	dec	si		| backup argv datum pointer
+
+L4:	mov	al,(si)		| Check for special cases:
+	cmp	al,*grt		| redirect output?
+	jz	stdo		| yup.
+	cmp	al,*lt		| input?
+	jz	stdi
+
+	mov	ax,si		| stick current pointer into argv
+	stow
+L41:	loop	L3
+
+	mov	ax,sp		| set up two arguments to _main, first argv
+	push	ax	
+	mov	bh,*0
+	push	bx		| and then argc
+
+	mov	ax,sp		| compute lower stack limit
+	sub	ax,*64		| give ourselves a little breathing room
+	cmp	ax,#_end	| have we already run out of space?
+	ja	Lok
+
+__bomb:	mov	ax,#Lmsg	| oops, tell user and then abort
+	push	ax
+	call	_prints
+	int	0x20
+
+Lok:
+	mov	cx,#_end	| zero bss storage
+	mov	di,#_edata	| starting at end of initialized data
+	sub	cx,di
+	jz	Lclear		| no bss => nothing to do
+	shr	cx,*1		| change into word count
+	xor	ax,ax		| ax will be stored into each word of bss
+	repz			| don't let the "z" fool you!
+	stow
+
+Lclear:
+|	call	fpinit		| set up 8087 modes
+	seg	cs
+	mov	ax,version
+	mov	_version,ax
+
+	call	_dos_ini	| set up for system calls
+
+	call	_main		| let user do his thing...
+	add	sp,*4
+
+	push	ax
+
+	call	__exit		| clean up, etc.
+
+	mov	bx,sp		| if anyone cares, put exit status in ax
+	mov	ax,*2(bx)
+	int	0x20		| this really exits
+
+| I/O redirect hackery:
+
+stdi:	inc	si		| Skip over the '<'
+	mov	__stdi,si	| Just tuck away name, for dos_init.
+	dec	bx		| but correct argc.
+	jmp	L41		| and return to loop.
+
+stdo:	inc	si		| skip the '>'
+	mov	al,(si)		| check for std err redirection.
+	cmp	al,*and		| (blah) csh syntax.
+	jnz	stdo1		| nope, just stdout.
+	inc	si
+	mov	__stde,si	| save both away.
+stdo1:	mov	__stdo,si
+	dec	bx		| argc adjustment
+	jmp	L41
+
+	.data
+	.even
+__memtop:
+	.word	_end		| current top of user data
+__stdi:	.word	0		| file names, for i/o redirection.
+__stdo:	.word	0
+__stde:	.word	0
+
+Lmsg:	.ascii	"*** Not enough memory, aborting..."
+	.byte	0xa,0xd,0

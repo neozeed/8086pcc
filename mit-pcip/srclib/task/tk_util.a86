@@ -1,0 +1,116 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+
+| This file contains assembly code for the machine dependent features of
+|	Larry Allen's tasking package as now implemented on the IBM PCs.
+
+tk	=	4
+base	=	6
+entry	=	8
+arg	=	10
+tk_sp	=	0
+guard	=	0x1234
+
+	.globl	__cdump
+	.globl	_tk_frame
+
+_tk_frame:
+	push	bp
+	mov	bp,sp
+
+	mov	bx,base(bp)	| get the stack base
+
+	dec	bx		| 	what I'd give for an autodecrement
+	dec	bx		|	addressing mode...
+
+	mov	(bx),*0		| a foney fp, make better later
+	dec	bx
+	dec	bx
+
+	mov	cx,*arg(bp)
+	mov	(bx),cx
+	dec	bx
+	dec	bx
+
+	mov	cx,*__cdump
+	mov	(bx),cx		| an error trapping function.
+
+	mov	dx,bx		| save addr of previous fp
+	dec	bx		| set entry point
+	dec	bx
+	mov	cx,entry(bp)
+	mov	(bx),cx
+
+	dec	bx		| set previous fp
+	dec	bx
+	mov	(bx),dx
+
+	mov	dx,bx
+	mov	bx,tk(bp)	| install knowledge of stack in task thingie
+	mov	tk_sp(bx),dx	
+
+	pop	bp
+	ret
+
+
+| And, here we have the routine which actually switches from one task to
+|	another... ho hum.
+
+	.globl	_tk_cur
+	.globl	_tk_swtch
+
+_tk_swtch:
+	push	bp
+	mov	bp,sp		| now for a bit of stack perversity...
+
+	mov	bx,_tk_cur	| find the current task
+	mov	tk_sp(bx),bp
+	mov	bx,tk(bp)	| get new task context thingie stuff
+	mov	_tk_cur,bx	| make it well known
+	mov	bp,tk_sp(bx)	| restore saved fp
+
+	mov	sp,bp		| restore sp
+	pop	bp		| return in new context (???)
+	ret
+
+	.globl	__stk_sys_fill
+__stk_sys_fill:
+	push	bp
+	mov	bp,sp
+	push	di
+
+	mov	cx,*4(bp)	| get the number of bytes to reserve
+
+	mov	ax,sp
+	sub	ax,*2		| reserve space which we'll use in a moment
+
+	sub	ax,cx		| ax now has address to start fill at
+
+do_fill:
+	push	ax		| use of reserved space
+				| saving pointer to beginning of guard words
+	sar	cx,*1		| adjust cx to be a word count
+	mov	di,ax
+	mov	ax,*guard
+	cld			| set direction flag for increment
+loop:
+	stow			| damned stos doesn't decrement cx so
+	dec	cx		| I can't use repnz
+	jnz	loop
+
+	pop	ax		| return the beginning of the guard
+	pop	di
+	pop	bp
+	ret
+
+	.globl	__stk_fill
+__stk_fill:
+	push	bp
+	mov	bp,sp
+	push	di
+
+	mov	cx,*4(bp)
+
+	mov	ax,*6(bp)
+	jmp	do_fill

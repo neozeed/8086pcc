@@ -1,0 +1,18 @@
+	.globl	_alt_key
+
+segment	=	0x40
+kb_flag	=	0x17
+alt_shift =	0x08
+
+| alt_key() - Returns 1 if the alt key is depressed else returns 0.
+
+_alt_key:
+	push	ds
+	mov	ax,#segment
+	mov	ds,ax
+	xor	ax,ax
+	test	kb_flag,#alt_shift
+	jz	done
+	inc	ax
+done:	pop	ds
+	ret

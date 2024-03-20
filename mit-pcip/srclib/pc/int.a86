@@ -1,0 +1,14 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+
+	.globl	_int_off
+	.globl	_int_on
+
+_int_off:
+	cli
+	ret
+
+_int_on:
+	sti
+	ret

@@ -1,0 +1,35 @@
+.SUFFIXES: .c .a86 .b
+
+LIB = ../../lib
+INCLUDE = ../../include
+
+H19OBJS = curse.b h19line.b em.b h19.b _wbyte.b h19key.b \
+	scr_close.b kh.b sh.b alt.b
+
+SUPOBJS = curse.b scr_close.b supdup.b _wbyte_sup.b kh.b sh.b
+
+install: libh19 libsup
+
+libh19: ${H19OBJS}
+	ar r ${LIB}/libh19.a ${H19OBJS}
+	ranlib ${LIB}/libh19.a
+
+h19.b h19line.b h19key.b: ${INCLUDE}/h19.h
+
+libsup: ${SUPOBJS}
+	ar r ${LIB}/libsup.a ${SUPOBJS}
+	ranlib ${LIB}/libsup.a
+
+lintlib:
+	lint86 -Ch19 _wbyte.c h19.c h19key.c scr_close.c stdne.c \
+	stinit.c lint.c
+	mv llib-lh19.ln ${LIB}
+	lint86 -Csup _wbyte_sup.c supdup.c h19key.c scr_close.c stdne.c \
+	stinit.c lint.c
+	mv llib-lsup.ln ${LIB}
+
+.c.b:
+	cc86 -c -DDEBUG $*.c
+
+.a86.b:
+	a86 $*

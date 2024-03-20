@@ -1,0 +1,139 @@
+#include <stdio.h>
+#include <netbuf.h>
+#include <timer.h>
+
+/* This file contains the initialization code for the serial line net for
+	the PC's. It has been rewritten to be compatible with the new
+	multi-net system for the PC's. In other words, the names have
+	been changed to protect the innocent.
+	Now, SL_INIT() has to initialize the serial port, perhaps fill in
+	some of its net struct and fork the serial line packet to protocol
+	demultiplexor. */
+
+NET	*sl_net;	/* Serial line net descriptor */
+Task	SlDemux;	/* The packet-to-protocol demultiplexor. */
+static Task slpreq;	/* requesting task */
+extern int sl_demux();	/* "		"		" 	 */
+extern int sl_slp();	/* Serial Line Protocol Handler */
+static int wake_me();
+
+#define	TRUE	1
+
+sl_init(net, baud, dummy)
+	NET *net;
+	unsigned baud;
+	unsigned dummy; {
+	PACKET p;
+	timer *tm;
+
+	if(NDEBUG & INFOMSG)
+		printf("Initializing Serial Port.\n");
+
+	if(baud == 0) {
+		printf("The baud rate has not been customized! You should ");
+		printf("set it using the customizer\nand try again.\n");
+		exit();
+		}
+
+	init_aux(baud);		/* initialize the serial port */
+
+	if(NDEBUG & INFOMSG)
+		printf("Forking SLDEMUX. Routine addr = %u.\n", sl_demux);
+
+	SlDemux = tk_fork(tk_cur, sl_demux, net->n_stksiz, "SLDEMUX");
+	if(NDEBUG & INFOMSG)
+		printf("SlDemux is %04x.\n", SlDemux);
+	sl_net = net;
+	net->n_demux = SlDemux;
+	
+	/* Now set up the code for the SLP (serial line protocol) handler
+		so we can find out our address from the PC gateway and such. */
+
+	p = a_getfree();
+	if(NDEBUG & INFOMSG)
+		printf("Sending SLP AddrReq to PC Gateway.\n");
+
+	slpreq = tk_cur;
+
+	if(NDEBUG & INFOMSG)
+		printf("Blocking on PC-GW Address Reply.\n");
+
+	tm = tm_alloc();
+	if(tm == 0) {
+		printf("SL_INIT: Couldn't allocate timer.\n");
+		exit();
+		}
+
+	/* Zero out our address so that if someone already set it that won't
+		screw us up. */
+
+	sl_net->ip_addr = 0L;
+
+	tm_set(2, wake_me, 0, tm);
+	if(sl_write(p, SLP, 0) < 0) {
+		printf("SL_INIT: Couldn't send Address Request packet.\n");
+		net_stats(stdout);
+		exit();
+		}
+
+	tk_block();
+
+	tm_clear(tm);
+	tm_free(tm);
+
+	if(sl_net->ip_addr == 0L) {
+		printf("SL_INIT: PC Address unknown. Forced to abort.\n");
+		net_stats(stdout);
+		exit();	}
+
+	if(NDEBUG & INFOMSG)
+		printf("Received Address Reply.\n");
+
+	return;	}
+
+
+/* Process an incoming SLP packet. If it contains data, use this as our
+	address. If it has no data (len = 0) consider it a request
+	and send out a phony address. */
+
+sl_slp(p, len, n)
+	PACKET p;
+	int len;
+	NET *n; {
+	int num;
+	long addr;
+
+	if(NDEBUG & INFOMSG)
+		printf("Received SLP packet of length %u\n", len);
+
+	if(len == 4) {
+		addr = *((long *)p->nb_prot);
+		if(NDEBUG & INFOMSG) {
+			printf("SLP: IP address is ");
+			out_inaddr(stdout, addr);
+			printf(".\n");	}
+
+		sl_net->ip_addr = addr;
+		wake_me();
+		if(NDEBUG & INFOMSG)
+			printf("Freeing received SLP packet.\n");
+		putfree(p);	}
+
+	else if(len == 0) {
+		p->nb_prot[0] = 022;
+		p->nb_prot[1] = 011;
+		p->nb_prot[2] = 000;
+		p->nb_prot[3] = 001;
+
+		sl_write(p, SLP, 4);
+		putfree(p);	}
+	else {
+		if(NDEBUG & INFOMSG || NDEBUG & PROTERR)
+			printf("SLP: Received bad packet length.\n");
+		putfree(p);	}
+
+	}
+
+static int wake_me() {
+	tk_wake(slpreq);	}
+

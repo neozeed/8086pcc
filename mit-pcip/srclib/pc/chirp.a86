@@ -1,0 +1,57 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+
+	.globl	_ring		| program to make sound for ASCII BEL code
+
+portb	=	0x61		| PC address for port that gates speaker
+timer2	=	0x42		| PC address for timer that drives speaker
+timctl	=	0x43		| PC address for timer load control register
+timcw	=	0xB6		| Control byte for: timer 2, load lsb and msb,
+				| output square wave, count in binary.
+startc	=	800		| Start chirp at 1487 Hz (F'')
+
+_ring:	push	bp
+	push	ax
+	push	bx
+	push	cx
+
+	mov	ax,*startc	| Start at F'' (1487 Hz).
+	mov	divisor,ax	| initialize clock stuffer
+
+	mov	al,*timcw	| Get timer control byte and
+	out	timctl		| set timer control register.
+	mov	ax,divisor	| Make sure timer running when we
+	out	timer2		| first start the loudspeaker
+	mov	al,ah		| ..
+	out	timer2		| ..
+	in	portb		| Get old port control byte
+	push	ax		| and save it.
+	or	al,*03		| Make up a new one, and turn
+	out	portb		| bell on
+
+	mov	bl,*25		| Number of segments in chirp
+g6:	mov	cx,*1000		| length of segment, 10 ms
+g7:	loop	g7		| dally
+	mov	ax,divisor	| Get latest divisor
+	sub	ax,*24		| Make it smaller
+	mov	divisor,ax	| Put it back
+	out	timer2		| and also in the timer
+	mov	al,ah		| ..
+	out	timer2		| ..
+	dec	bl		| Are there any more segments?
+	jnz	g6		| Yes, go do them too.
+
+	pop	ax		| No, restore original port control byte.
+	and	al,*0xFC	| Make sure speaker control bits off.
+	out	portb		| ..
+
+	pop	cx
+	pop	bx
+	pop	ax
+	pop	bp
+	ret			| Return to DOS.
+
+	.data
+divisor:	.word	0		| Current divisor
+portcb:		.byte	0		| Place to hold old port control byte.

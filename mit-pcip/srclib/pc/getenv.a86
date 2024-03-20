@@ -1,0 +1,112 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+
+| getenv(name, buffer)
+|	char *name;
+|	char *buffer;
+|
+| lookup name in the environment and put its value in buffer
+
+equals	=	61
+envseg	=	0x2c
+buffer	=	6
+name	=	4
+len	=	-8
+start	=	-10
+pequ	=	-12
+
+	.text
+	.globl	_getenv
+_getenv:
+	push	bp
+	mov	bp,sp
+	push	si
+	push	di
+	push	es
+
+	sub	sp,*8
+
+	push	*name(bp)
+	call	_strlen
+	inc	ax
+	mov	*len(bp),ax
+	pop	ax
+
+	seg	cs
+	mov	es,envseg
+	mov	di,*0
+
+	cld
+lp1:
+	mov	*start(bp),di	| set start = beginning of the current string
+
+	movb	al,*equals
+	mov	cx,*0xffff
+
+	repnz
+	scab			| find the "=" in the string
+
+	dec	di
+
+	seg	es
+	movb	(di),*0x00	| terminate string
+
+	mov	*pequ(bp),di	| set pequ = address of "=" sign
+
+	mov	cx,*len(bp)	| prepare for strcmp
+	mov	di,*start(bp)
+	mov	si,*name(bp)
+
+	repz
+	cmpb
+
+	mov	di,*pequ(bp)	| restore pointer to "="
+	seg	es
+	movb	(di),*equals
+
+	jz	found		| if Z then we've matched
+
+	inc	di
+	mov	cx,*0xffff	| prepare to search for a 0
+	xor	ax,ax
+
+	repnz
+	scab
+
+	seg	es
+	cmpb	(di),*0
+
+	jnz	lp1
+
+	mov	bx,*buffer(bp)
+	mov	(bx),*0
+
+	jmp	return
+
+found:
+	inc	di
+	mov	si,di
+	mov	di,*buffer(bp)
+	push	es
+	push	ds
+	pop	es
+	pop	ds
+
+floop:
+	movb
+	cmpb	*-1(si),*0
+	jnz	floop
+
+	push	es
+	pop	ds
+
+return:
+	add	sp,*8
+	pop	es
+	pop	di
+	pop	si
+	pop	bp
+	ret
+
+

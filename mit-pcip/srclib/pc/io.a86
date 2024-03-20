@@ -1,0 +1,97 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+
+| file: io.a86			INPUT and OUTPUT functions for C
+
+
+| Input/Output instruction interface to 8086. (26Feb82)	(Wayne)
+| 	added inw, outw, inw2, outw2	      ( 8Jan83) (Romkey)
+
+| int outb(port, value) -- Output value to specific port.
+	.globl	_outb
+
+	.text
+_outb:
+	push	bp		| entry sequence
+	mov	bp,sp
+
+	mov	dx,*4(bp)	| get port into DX
+	mov	ax,*6(bp)	| argument pointer into AX
+	out			| perform output instruction
+
+	pop	bp
+	ret
+
+| int outw(port, value) -- Output value to specific port.
+	.globl	_outw
+
+	.text
+_outw:
+	push	bp		| entry sequence
+	mov	bp,sp
+
+	mov	dx,*4(bp)	| get port into DX
+	mov	ax,*6(bp)	| argument pointer into AX
+	out			| perform output instruction
+
+	inc	dx
+	mov	al,ah
+	out
+
+	pop	bp
+	ret
+
+| int outw2(port, value) -- Output value to specific port.
+	.globl	_outw2
+
+	.text
+_outw2:
+	push	bp		| entry sequence
+	mov	bp,sp
+
+	mov	dx,*4(bp)	| get port into DX
+	mov	ax,*6(bp)	| argument pointer into AX
+	out			| perform output instruction
+
+	mov	al,ah
+	out
+
+	pop	bp
+	ret
+
+| char inb(port) -- input one byte from port.
+
+	.globl	_inb
+
+	.text
+_inb:	
+	push	bp		| entry sequence
+	mov	bp,sp
+
+	mov	dx,*4(bp)	| get port into DX
+	in			| perform input instruction
+	movb	ah,*0		| Clear high order byte
+
+	pop	bp
+	ret
+
+| unsigned inw(port) - input one word from a port
+
+	.globl	_inw
+
+	.text
+_inw:	
+	push	bp		| entry sequence
+	mov	bp,sp
+
+	mov	dx,*4(bp)	| get port into DX
+	inc	dx
+	in			| perform input instruction
+	movb	ah,al		| Set high order byte
+
+	dec	dx
+	in			| get low order byte
+
+	pop	bp
+	ret

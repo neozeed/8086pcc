@@ -1,0 +1,100 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+
+| crock.a86 contains the necessary strangeness for the alarm functions et al.
+| It has an interrupt handler and a slight interface to the real world
+| (ie: the high level schtuff)
+
+int_clock = 0x70	| address of secondary clock interrupt handler
+SIGALRM	  = 14		| alarm clock signal
+
+	.globl	__tcount	| crock count
+	.globl	_cticks		| crock ticks
+	.globl	_crock_init	| crock initialization
+	.globl	_crock_c	| crock cleanup
+_crock_init:
+	cli
+	push	ds
+	mov	ax,*0			| get interrupt vectors' data seg
+	mov	ds,ax
+	mov	bx,int_clock+2		| get interrupt's cs
+	mov	cx,int_clock
+
+	mov	int_clock,*crock	| initialize appropriate vector
+	mov	int_clock+2,cs
+
+	pop	ds
+	mov	save_cs,bx
+	mov	save_ip,cx
+
+	mov	__tcount,*0		| initialize count
+	sti
+	ret
+
+_crock_c:
+	mov	bx,save_cs
+	cmp	bx,*0
+	jz	rtrn
+
+	mov	cx,save_ip
+
+	cli
+	push	ds
+
+	mov	ax,*0
+	mov	ds,ax
+
+	mov	int_clock+2,bx
+	mov	int_clock,cx
+	pop	ds
+	sti
+rtrn:	ret
+
+	.data
+save_cs:
+	.word	0
+save_ip:
+	.word	0
+
+	.text
+crock:
+	push	ds
+	push	ax
+
+	mov	ax,cs
+	add	ax,#_data_seg
+	mov	ds,ax
+
+|	inc	_cticks
+|	jae	Lcont1
+|	inc	_cticks+2
+	add	_cticks,*1
+	adc	_cticks+2,*0
+
+Lcont1:
+	cmp	__tcount,*0
+	jz	done2
+
+	dec	__tcount
+	jnz	done2
+
+	push	bp
+	push	bx
+	push	cx
+	push	dx
+	push	si
+	push	di
+
+	call	@__alrm
+
+	pop	di
+	pop	si
+	pop	dx
+	pop	cx
+	pop	bx
+	pop	bp
+
+done2:	pop	ax
+	pop	ds
+	iret

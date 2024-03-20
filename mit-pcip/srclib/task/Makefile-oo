@@ -1,0 +1,19 @@
+.SUFFIXES: .c .a86 .b
+
+LIB = ../../lib
+
+OBJS = timer.b task.b tk_util.b stack.b
+
+task: ${OBJS}
+	ar r ${LIB}/libtask.a ${OBJS}
+	ranlib ${LIB}/libtask.a
+
+lintlib:
+	lint86 -Ctask stack.c task.c timer.c lint.c
+	mv llib-ltask.ln ${LIB}
+
+.c.b:
+	cc86 -c -DDEBUG $*.c
+
+.a86.b:
+	a86 $*

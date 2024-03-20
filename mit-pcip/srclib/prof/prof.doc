@@ -1,0 +1,10 @@
+To make a profilable program:
+	Link in pcrt.b or pnetcrt.b instead of crt.b or netcrt.b. Link
+in the libprof.a before libS.a by saying -lprof before -lS in the ld86
+line. Keep around the a.out file.
+
+To profile a program:
+	Run the profilable program. When it finishes, it should leave
+behind a file called profile.pro. Transfer this program to the
+appropriate vax in image mode. On the vax, run merge giving it the
+a.out file and the profile.pro file as arguments.

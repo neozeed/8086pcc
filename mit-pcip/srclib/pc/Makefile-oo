@@ -1,0 +1,22 @@
+.SUFFIXES: .b .a86 .c .h
+
+LIB = ../../lib
+OBJS = getopt.b _prints.b gencpy.b chirp.b io.b crock.b q.b \
+	signal.b dosl.b mkraw.b ffirst.b crit_err.b int.b seg.b
+
+#OBJS = getopt.b gencpy.b getenv.b chirp.b io.b crock.b \
+#	signal.b dosl.b mkraw.b ffirst.b crit_err.b
+
+libc: ${OBJS}
+	ar r ${LIB}/libpc.a ${OBJS}
+	ranlib ${LIB}/libpc.a
+
+lintlib:
+	lint86 -Cc random.c signal.c time.c lint.c
+	mv llib-lc.ln ${LIB}
+
+.c.b:
+	cc86 -c $*.c
+
+.a86.b:
+	a86 $*

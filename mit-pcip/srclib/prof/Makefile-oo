@@ -1,0 +1,15 @@
+.SUFFIXES: .b .a86 .c .h
+
+LIB = ../../lib
+
+libprof: profile.b prof.b pcrt.b pnetcrt.b
+	mv pcrt.b ${LIB}
+	mv pnetcrt.b ${LIB}
+	ar r ${LIB}/libprof.a profile.b prof.b
+	ranlib ${LIB}/libprof.a
+
+.c.b:
+	cc86 -c -DDEBUG $*.c
+
+.a86.b:
+	a86 $*

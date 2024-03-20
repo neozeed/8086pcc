@@ -1,0 +1,24 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+
+
+| This function fixes it so that dos's cursor will be on the same line as
+| the h19 emulator's was when we're all through.
+
+	.globl	_y_pos		| vertical cursor coordinate
+	.globl	__curse
+	.text
+__curse:
+
+	mov	dh,_y_pos	| frob it good
+	movb	dl,*0
+
+	movb	bh,*0		| set the active page number
+	mov	ah,*2		| now, actually set the position
+	int	0x10
+
+	ret
+
+
+

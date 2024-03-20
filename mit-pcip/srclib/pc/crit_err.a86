@@ -1,0 +1,54 @@
+| critical error handler for the spooler
+| Written 5/18/84 - John Romkey
+
+	.globl	_crit_install
+	.globl	_crit_destall
+
+	.data
+oldcs:	.zerow	1
+oldip:	.zerow	1
+	.text
+
+crerr_off	= 0x24*4
+crerr_seg	= crerr_off+2
+
+| theoretically we don't have to save the old critical error handler
+| since the DOS manual says that it will be restored automatically when
+| we return control to COMMAND.COM.
+
+_crit_install:
+	push	ds
+	xor	ax,ax
+	mov	ds,ax
+	mov	bx,crerr_off
+	mov	cx,crerr_seg
+	mov	crerr_off,*criterrhnd
+	mov	crerr_seg,cs
+
+	pop	ds
+	mov	oldcs,cx
+	mov	oldip,bx
+
+	ret
+
+| return control to whoever had it before we usurped them
+_crit_destall:
+	mov	bx,oldip
+	mov	cx,oldcs
+
+	push	ds
+	xor	ax,ax
+	mov	ds,ax
+	mov	crerr_off,bx
+	mov	crerr_seg,cx
+	pop	ds
+	ret
+
+| handle a critical error: reboot
+criterrhnd:
+| I got tired of trying to figure what the assembler wanted as the
+| instruction format.
+	sti
+	.byte	0xea	| jump intersegment absolute address
+	.word	0	| offset 0
+	.word	0xffff	| segment ffff

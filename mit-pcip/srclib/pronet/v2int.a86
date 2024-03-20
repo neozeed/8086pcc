@@ -1,0 +1,147 @@
+|  Copyright 1984 by Proteon, Inc.
+
+|  See permission and disclaimer notice in file "proteon-notice.h"
+
+| v2int.a86
+
+| this file contains two pieces of code. One, _v2_patch(), patches the handler
+| for the v2lni interrupt. The other, v2int() handles the
+| interrupt and calls a (hopefully) C routine, v2_int(), to actually do
+| the grunge.
+
+	.globl	_v2_patch
+	.globl	_v2_unpatch
+	.globl	_v2dma
+	.globl	_v2_ihnd
+	.globl	_v2_eoi
+
+int	=	0x20		| base address of interrupt vectors
+ocwr	=	0x20		| 8259A interrupt controller control register
+
+	.data
+old_off:
+	.zerow	1	| a place to store the old contents of the interrupt
+old_cs:
+	.zerow	1	| vector used by the ethernet controller
+intvec:
+	.zerow	1	| the vector itself
+
+	.text
+_v2_patch:
+	push	bp
+	mov	bp,sp
+	push	si
+
+	mov	ax,*4(bp)
+	add	ax,*int
+	mov	intvec,ax
+	mov	si,ax
+
+	push	ds
+	xor	ax,ax
+	mov	ds,ax
+	mov	bx,(si)		| save old offset
+	mov	cx,*2(si)	| save old data segment
+
+	mov	(si),*v2int	| the interrupt handler
+	mov	*2(si),cs	| our code segment
+	pop	ds		| new vector is now patched in
+
+	mov	old_off,bx	| cobble away the old offset and code segment
+	mov	old_cs,cx
+
+	pop	si
+	pop	bp
+	ret
+
+_v2_unpatch:
+	push	si
+
+	mov	si,intvec
+	mov	bx,old_off	| patch back in the old interrupt vector
+	mov	cx,old_cs
+
+	push	ds
+	xor	ax,ax
+	mov	ds,ax
+
+	cli
+	mov	(si),bx
+	mov	*2(si),cx
+	pop	ds
+	sti
+
+	pop	si
+	ret
+
+| This routine saves the registers and calls a C routine to handle the
+| interrupt.
+
+v2int:
+	push	ds	| save registers
+	push	si
+	push	di
+	push	bp
+	push	ax
+	push	bx
+	push	cx
+	push	dx
+
+	| set up our data segment
+	mov	ax,cs
+	add	ax,#_data_seg
+	mov	ds,ax
+
+	call	_v2_ihnd
+
+	pop	dx
+	pop	cx
+	pop	bx
+	pop	ax
+	pop	bp
+	pop	di
+	pop	si
+	pop	ds
+	iret
+
+
+| This routine takes an address of a packet buffer as an argument. It sets up
+| the DMA controller and page register to point at the beginning of this
+| packet. It does not set the length register in the DMA controller or start
+| the DMA. We use channel one.
+| Note: **** Well, it needs to be fixed to use any channel ****
+| 	the mapping from channel number to page register port # is not trivial
+
+_v2dma:
+	push	bp
+	mov	bp,sp		| set up the frame pointer
+
+	mov	bx,*4(bp)	| get the address of the packet
+
+	mov	ax,ds		| get the segment
+	mov	cl,*4
+	rol	ax,cl
+
+	mov	ch,al		| save the lower four bits = page number
+	and	al,*0xf0
+	add	ax,bx
+	adc	ch,*0
+
+|	jae	skip
+|	inc	ch
+|skip:
+
+	mov	dx,*2
+	out
+	mov	al,ah
+	out
+
+	mov	al,ch
+	and	al,*0x0f
+	mov	dx,*0x83
+	out			| output to the page register
+
+	mov	ah,*0
+
+	pop	bp
+	ret

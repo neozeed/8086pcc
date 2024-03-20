@@ -1,0 +1,194 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+
+
+| C startup routine for IBM DOS (4/83). Modiifed for the net code to
+| do cleanup after program exit and to copy the customization options
+| structure into the DS.
+| 6/13/84 - bug in segmemnt comparison for sp setup fixed. jge -> jae.
+|				<John Romkey>
+
+| proper operation requires that this be linked as first file.
+
+	.globl	_main		| user program
+	.globl	__exit		| really exit!
+	.globl	__memtop	| current top of user data
+
+	.globl	_exit		| exit code(currently same as __exit)
+	.globl	_etext		| end of text segment
+	.globl	_data_seg	| start of data segment(offset from code seg)
+	.globl	_edata		| end of data segment
+	.globl	_end		| end of bss segment
+	.globl	dummy		| return for unneeded inits
+	.globl	_version
+
+qmark	=	077	| question mark character
+space	=	040	| space character
+
+	.data
+	.even
+_version:
+	.zerow	1
+	.text
+
+| format of memory:
+|	---------------  <- 0x0 (CS, plus on entry DS, ES, SS)
+|	 DOS Interface
+|	---------------  <- 0x100
+|	     code
+|	---------------  <- mod 16 boundary (after setup: DS, ES, SS)
+|	   data,bss
+|
+|
+|
+|	    stack
+|	---------------  <- min(base of data + 64K, top of memory)
+
+|| set up segment registers and stack pointer
+	jmp	crtstart
+version:
+	.word	0
+crtstart:
+	cli			| no interrupts til segment hacking complete
+	mov	ax,cs		| get code segment
+	add	ax,#_data_seg	| add to get data segment
+	mov	es,ax		| set up "data space" segment regs
+	mov	ss,ax		| we'll do DS after copying JCL
+
+|	mov	sp,*0		| start stack at top of "data space"
+	mov	bx,0x2		| see how big memory is... (in 16 byte hunks)
+	sub	bx,ax		| calculate how much data space
+	cmp	bx,#0x1000	| if larger than 64K, sp is set correctly
+	jae	spok
+	mov	cl,*4		| BUG FIX
+	shl	bx,cl		| if smaller, convert what we have into offset
+	mov	sp,bx		| and use that as top of stack
+spok:	sti
+
+|| create argc and argv from JCL provided by DOS.
+	cld
+	mov	si,#0x80	| start of JCL string
+	lodb			| AL gets string length
+	movb	cl,al		| make it into full word => CX
+	movb	ch,*0
+
+	sub	sp,*3		| reserve space for "?" + nulls
+	sub	sp,cx		| space for JCL string
+	and	sp,*0xFFFE	| word align stack for 8086...
+
+	mov	di,sp		| argv[0] = "?"
+	movb	al,*qmark
+	stob
+	movb	al,*0
+	stob
+
+	movb	bl,*1		| temporary copy of argc
+	movb	bh,*0		| last character seen
+
+	jcxz	aend		| if (length(JCL) == 0) punt following code
+aloop:	lodb			| get next character from jcl
+	cmpb	al,*space	| spacing chars mark end of current token
+	jg	L1
+	movb	al,*0		| change spacing chars into nulls
+	cmpb	bh,*0		| increment argc (bl) if last char was end of token 
+	je	L1
+	incb	bl
+L1:	stob			| save next character into argv
+	movb	bh,al		| keep track of last character read
+	loop	aloop		| run through all the characters
+
+aend:	movb	al,*0		| finish last element of argv with a null
+	stob
+	cmp	bh,*0		| and bump argc if appropriate
+	je	L2
+	incb	bl
+
+L2:	mov	cx,es		| make data segment point to real data segment
+	mov	ds,cx
+	mov	si,sp		| SI = beginning of argv datum
+	mov	cl,bl		| CX = argc
+	mov	ch,*0
+	sub	sp,cx		| allocate space for argv vector
+	sub	sp,cx		| remember to allocate words!
+
+	mov	di,sp		| DI = &argv[0]
+	mov	dx,*-1		| will be used for count below
+	j	L4
+
+L3:	movb	al,*0		| set up to use scab to search for nulls
+	xchg	si,di		| get pointers into correct regs
+	xchg	cx,dx
+	repnz
+	scab			| skip over first token
+	repz
+	scab			| skip over nulls
+	xchg	cx,dx
+	xchg	si,di
+	dec	si		| backup argv datum pointer
+L4:	mov	ax,si		| stick current pointer into argv
+	stow
+	loop	L3
+
+	mov	ax,sp		| set up two arguments to _main, first argv
+	push	ax	
+	mov	bh,*0
+	push	bx		| and then argc
+
+
+Lok:	mov	cx,#_end	| zero bss storage
+	mov	di,#_edata	| starting at end of initialized data
+	sub	cx,di
+	jz	Lclear		| no bss => nothing to do
+	shr	cx,*1		| change into word count
+	xor	ax,ax		| ax will be stored into each word of bss
+	repz			| don't let the "z" fool you!
+	stow
+
+Lclear:
+	seg	cs		| copy the version number into data space
+	mov	ax,version
+	mov	_version,ax
+
+	call	_stinit		| initialize standard I/O library
+	call	_prof_start
+	call	_main		| let user do his thing...
+	add	sp,*4
+
+_exit:
+__exit:
+	call	_prof_end	| BEFORE _netclose!!!
+	call	_netclose
+	call	_stdne
+	mov	bx,sp		| if anyone cares, put exit status in ax
+	mov	ax,*2(bx)
+	int	0x20		| this really exits
+
+dummy:				| used by the linker for routines that are
+	ret			| not needed
+
+	.text
+copyright:
+	.asciz "See permission and disclaimer notice in file <notice.h>."
+
+	.data
+	.even
+__memtop:
+	.word	_end		| current top of user data
+
+
+	.text	
+	.globl	_int_on
+_int_on:			| Turn Interrupts ON
+	sti
+	ret
+	
+	.globl	_int_off
+_int_off:			| Turn Interrupts OFF
+	cli
+	ret
+
+	.globl	_get_ds
+_get_ds:			| return the value in DS
+	mov	ax,ds
+	ret

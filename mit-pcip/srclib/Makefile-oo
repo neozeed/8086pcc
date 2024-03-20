@@ -1,0 +1,12 @@
+# make all the cmds
+
+SUBDIR= pc em ether internet net pronet serial task tcp tftp udp prof \
+	wpronet
+
+all: /tmp
+	for i in ${SUBDIR}; do \
+		(cd $$i; make); done
+
+lintlib:
+	for i in ${SUBDIR}; do \
+		(cd $$i; make lintlib); done

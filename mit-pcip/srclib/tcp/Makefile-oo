@@ -1,0 +1,17 @@
+.SUFFIXES: .c .a86 .b
+
+LIB = ../../lib
+
+tcp: tcp.b tcp_dump.b
+	ar r ${LIB}/libtcp.a tcp.b tcp_dump.b 
+	ranlib ${LIB}/libtcp.a
+
+lintlib:
+	lint86 -Ctcp tcp.c tcp_dump.c
+	mv llib-ltcp.ln ${LIB}
+
+.c.b:
+	cc86 -c -DDEBUG $*.c
+
+.a86.b:
+	a86 $*

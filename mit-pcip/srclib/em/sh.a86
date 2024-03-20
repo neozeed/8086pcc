@@ -1,0 +1,560 @@
+|  Copyright 1984 by the Massachusetts Institute of Technology  
+|  See permission and disclaimer notice in file "notice.h"  
+
+| written by David Bridgham
+| 9/5/84 - fixed bug in scrolldn which messed up blanking the new line.
+|	bug fix first reported by Rob Hagens.	<John Romkey>
+| 10/19/84 - added calls to exit_hook.		<John Romkey>
+| 11/12/84 - Fixed bug in cursor position       <J. H. Saltzer>
+| 11/18/84 - Changed init to not reset graphics card as long as it's in
+|		80x25 mode.			<John Romkey>
+| 11/19/84 - rearranged copy loop in scrollup to eliminate garbage
+|	character in lower left corner.		<John Romkey>
+
+	.globl	_scr_init	|initialize variables and controller
+	.globl	_move_lines	|move lines
+	.globl	_scrollup	|scroll screen up
+	.globl	_scrolldn	|scroll screen down
+	.globl	_clear_lines	|clear lines
+	.globl	_write_line	|write line
+	.globl	_read_line	|read line
+	.globl	_write_char	|write character
+	.globl	_nwrite_char	|write character with no cursor change
+	.globl	_set_cursor	|set cursor
+	.globl	_rset_cursor	|reset cursor to previous position
+	.globl	_attrib		|the current attribute byte
+	.globl	_scr_rest	|returns the 6845 to a known state
+	.globl	_x_pos		|the x cursor position
+	.globl	_y_pos		|the y cursor position
+	
+space = 0x20		|ASCII space character
+start_h = 12		|Start address (high)
+start_l = 13		|Start address (low)
+high = 14		|high cursor position register
+low = 15		|low cursor position register
+line_len = 80		|Line length
+screen_size = 80*24	|Characters on the whole screen
+video_bios = 0x10	| bios video interrupt
+vid_set_mode = 2	| ax value to set 80x25 mode, color
+vid_get_mode = 0x0f00	| ax value to get current mode
+curs_pos = 0x0300	| ax value to get current cursor position
+
+	.text
+
+| scr_init() - Initializes various variables and the 8245
+
+_scr_init:
+	mov	ax,*vid_get_mode	
+	int	video_bios
+	cmp	al,*7
+	je	bw_screen
+	cmp	al,*2
+	je	no_set
+	cmp	al,*3
+	je	no_set
+
+	mov	ax,*vid_set_mode
+	int	video_bios
+
+no_set:
+	mov	ax,*0xb800	| set color parameters for color card
+	mov	screen,ax
+	mov	ax,*0x3fff
+	mov	mem_mask,ax
+	mov	ax,*0x3d4
+	mov	index,ax
+	mov	ax,*0x3d5
+	mov	data,ax
+	
+bw_screen:
+	| set the cursor position to the current cursor position
+	mov	bh,*0
+	mov	ax,*curs_pos
+	int	video_bios
+	mov	bl,dh
+	mov	bh,*0
+
+	mov	_y_pos,bx
+	mov	dh,*0
+	mov	_x_pos,dx
+	| compute _pos
+	mov	ax,bx
+	movb	cl,*80
+	mulb	cl
+	add	ax,dx
+	mov	_pos,ax
+
+	|Now if we are on row 25 things will really get screwed up.
+	| So the idea is to scroll the screen up one line and put the
+	| cursor on the 24th line.
+	cmp	bx,*24
+	jnz	not_25
+	mov	ax,*24		|the things you have to put up with
+	push	ax		|with a crufty architecture
+	mov	ax,*0
+	push	ax
+	mov	ax,*1
+	push	ax
+	call	_move_lines
+
+	pop	ax
+	pop	ax
+	pop	ax
+
+	mov	_y_pos,*23	| set the cursor to the 24th line
+	mov	ax,_pos
+	sub	ax,*80
+	mov	_pos,ax
+
+not_25:	ret
+
+
+|move_lines(Sy,Dy,n) - Move line Sy to line Dy. Do for n lines. If Sy > Dy
+| then the screen is scrolled up. Else the screen is scrolled down.
+| Unfortunatly, there is a slight crock in how I wrote this which I didn't
+| discover until long after the terminal emulator was working (I'm still
+| not sure how I ever made it work). If you are scrolling the screen down
+| (i.e. Sy < Dy), then the screen is numbered starting from line 1 instead
+| from line 0 as the rest of the commands are.
+
+_move_lines:
+	push	bp
+	mov	bp,sp
+	push	di
+	push	si
+	push	ds
+	push	es
+
+	mov	ax,*4(bp)	|get Sy
+	mov	bx,#line_len	|make ax point to first char of line Sy
+	mul	bx
+	add	ax,start_screen	|add in start of screen offset
+	shl	ax,*1
+	mov	si,ax
+	mov	ax,*6(bp)	|get Dy
+	mov	bx,#line_len	|make ax point ot first char of line Dy
+	mul	bx
+	add	ax,start_screen	|add in start of screen offset
+	shl	ax,*1
+	mov	di,ax
+	mov	ax,*8(bp)	|get n
+	mov	bx,#line_len	|figure out number of words to be moved
+	mul	bx
+	mov	cx,ax
+	push	_attrib		|store away attribute byte
+	cmp	si,di
+	jg	TtB		|if si greater then top to bottom
+	jl	BtT		|if di greater then bottom to top
+	pop	bx		|get rid of attribute byte
+	jmp	done		|if equal then pop and return
+
+TtB:	cld			|set index registers to auto-increment
+	mov	bx,mem_mask
+	and	di,bx		|wrap around at end of screen memory
+	and	si,bx		|wrap around at end of screen memory
+	mov	dx,start_screen
+	add	dx,#screen_size	|should stop when at end of screen
+	shl	dx,*1
+	and	dx,bx		|wrap around at end of screen memory
+	mov	ax,screen	|set segment registers to screen memory
+	mov	ds,ax
+	mov	es,ax
+loop:	cmp	si,dx		|check to see if source is after end of screen
+	je	clear		|if so clear remaining lines
+	movw			|move char and attribute byte
+	and	di,bx		|wrap around at end of screen memory
+	and	si,bx		|wrap around at end of screen memory
+	loop	loop		|do it for all chars.
+	pop	bx		|get rid of attribute byte
+	jmp	done
+
+BtT:	std			|set direction to auto-decrement
+	mov	bx,mem_mask
+	sub	di,#2		|point to end of previous line
+	and	di,bx		|wrap around at end of screen memory
+	sub	si,#2		|point to end of previous line
+	and	si,bx		|wrap around at end of screen memory
+	mov	dx,start_screen
+	dec	dx		|adjust so can test for equals
+	shl	dx,*1
+	and	dx,bx
+	mov	ax,screen	|set segment registers to screen memory
+	mov	ds,ax
+	mov	es,ax
+loop0:	cmp	si,dx		|check to see if source is above top of screen
+	je	clear		|if so clear the remaining destination
+	movw			|move char and attribute byte
+	and	si,bx
+	and	di,bx
+	loop	loop0		|do it for all the characters
+	pop	bx		|get rid of attribute byte
+	jmp	done
+
+clear:	pop	ax		|get attribute byte
+	mov	ah,al		|put it in high byte
+	mov	al,*space	|fill rest of destination with spaces
+loop6:	stow			|df,cx,di, and si should be already loaded
+	and	di,bx		|wrap at end of screen memory
+	loop	loop6
+
+done:	pop	es
+	pop	ds
+	pop	si
+	pop	di
+	pop	bp
+	ret
+
+
+| scrollup() - scrolls the screen one line up
+_scrollup:
+	mov	bx,start_screen
+	add	bx,*line_len	|compute new start addr
+	and	bx,mem_mask	|wrap around the same as the hardware
+	mov	start_screen,bx
+
+	mov	dx,index	|set start addr high
+	mov	al,*start_h
+	out
+	inc	dx
+	mov	al,bh
+	out
+	mov	dx,index	|set start addr low
+	mov	al,*start_l
+	out
+	inc	dx
+	mov	al,bl
+	out
+
+	push	es		|put 25th line back on the bottom and
+	push	ds		| clear the 24th line
+	push	di
+	push	si
+	mov	al,*space
+	mov	ah,_attrib
+	mov	dx,bx		|don't want to destroy bx yet
+	add	dx,#screen_size	|find start of 25th line
+	shl	dx,*1		|two bytes per character
+	mov	di,dx		|set destination pointer to start of 25th line
+	add	bx,#screen_size - line_len	|find start of 24th line
+	shl	bx,*1		|two bytes per character
+	mov	si,bx		|set source pointer to start of 24 line
+	mov	bx,mem_mask	|need this value after changing data segment
+	mov	cx,*line_len
+	mov	dx,screen	|set up es and ds to screen memory
+	mov	es,dx
+	mov	ds,dx
+	cld			|set auto-increment
+loop4:
+	and	di,bx		|wrap around the buffer like the hardware does
+	and	si,bx
+	movw			|move 25th line back to where it was
+	mov	*-2(si),ax	|clear the 24th line
+	loop	loop4
+	
+	pop	si
+	pop	di
+	pop	ds
+	pop	es
+	ret
+
+
+| scrolldn() - move screen one line down
+_scrolldn:
+	mov	bx,start_screen
+	sub	bx,*line_len	|compute new start addr
+	jae	above_zero	|see if has gone negative
+	add	bx,mem_mask	|yes, then adjust back to top of buffer
+	inc	bx		|mem_mask is one less than the size of the
+				|buffer memory
+above_zero:
+	mov	start_screen,bx
+
+	mov	dx,index	|set start addr high
+	mov	al,*start_h
+	out
+	inc	dx
+	mov	al,bh
+	out
+	mov	dx,index	|set start addr low
+	mov	al,*start_l
+	out
+	inc	dx
+	mov	al,bl
+	out
+
+	|restore 25th line
+	push	es
+	push	ds
+	push	di
+	push	si
+	mov	dx,bx
+	add	dx,#screen_size	|find 25th line
+	shl	dx,*1		|two bytes per character
+	and	dx,mem_mask	|wrap around at end of buffer
+	mov	di,dx		|set destination pointer to 25th line
+	mov	dx,bx
+	add	dx,#screen_size + line_len |this is where the 25th line was
+	shl	dx,*1		|two bytes per character
+	and	dx,mem_mask	|wrap around at end of buffer
+	mov	si,dx		|set source pointer to original 25th line
+	mov	cx,*line_len	|set number of words to move
+	mov	dx,mem_mask	|get these before changing segment registers
+
+	mov	ax,screen	|set up segments to screen memory
+	mov	es,ax
+	mov	ds,ax
+
+	mov	al,*space
+	mov	ah,_attrib
+
+	cld
+loop7:	movw			|copy the character and attribute
+	and	si,dx		|wrap around at end of buffer
+	and	di,dx
+	loop	loop7
+
+	|clear top line
+	shl	bx,*1		|two bytes per character
+	and	bx,dx		|wrap around at end of buffer
+	mov	di,bx		|set destination pointer
+	mov	cx,*line_len	|number of words to move
+loop5:	stow			|store the space
+	and	di,dx		|wrap around the buffer like the hardware does
+	loop	loop5
+	
+	pop	si
+	pop	di
+	pop	ds
+	pop	es
+	ret
+	
+
+| clear_lines(y,n) - clear n lines starting from line y
+
+_clear_lines:
+	push	bp
+	mov	bp,sp
+	push	di
+	push	si
+	push	es
+
+	cld			|set auto increment
+	mov	ax,screen	|set es to screen memory
+	mov	es,ax
+	mov	ax,*6(bp)	|get n
+	mov	bx,*80		|calculate number of charactes to be erased
+	mul	bx
+	mov	cx,ax		|put count in cx
+	mov	ax,*4(bp)	|get y
+	mov	bx,*80*2	|point to first char. of line y
+	mul	bx
+	add	ax,start_screen	|add in start of screen offset
+	add	ax,start_screen	|two bytes per entry
+	and	ax,mem_mask	|wrap around at end of screen memory
+	mov	di,ax		|destination is screen memory
+loop1:	movb	ah,_attrib	|load attribute byte
+	movb	al,*space	|load space
+	stow			|put word in screen memory
+	and	di,mem_mask	|wrap around at end of screen memory
+	loop	loop1		|do it for all the chars.
+
+	pop	es
+	pop	si
+	pop	di
+	pop	bp
+	ret
+
+
+|write_line(buf,y) -- writes chars. in buf to line y of screen memory
+|			the chars are assumed to include their attribute bytes
+
+	.text
+_write_line:
+	push	bp
+	mov	bp,sp
+	push	di
+	push	si
+	push	es
+
+	mov	ax,*6(bp)	|get y
+	mov	bx,#line_len	|get ax pointing to first char. of line y
+	mul	bx
+	add	ax,start_screen	|add in start of screen offset
+	and	ax,mem_mask	|wrap around at end of screen memory
+	shl	ax,*1		|two bytes per character
+	mov	di,ax		|screen memory is destination
+	mov	si,*4(bp)	|buf is source
+	cld			|set auto increment
+	mov	ax,screen	|set es to screen memory
+	mov	es,ax
+	mov	cx,#line_len	|load count
+loop2:	movw			|move word to screen memory
+	and	di,mem_mask	|wrap around at end of screen memory
+	loop	loop2		|do it for all the chars.
+
+	pop	es
+	pop	si
+	pop	di
+	pop	bp
+	ret
+
+
+|read_line(buf,y) -- copies line y from screen buffer to buf.
+
+	.text
+_read_line:
+	push	bp
+	mov	bp,sp
+	push	di
+	push	si
+	push	ds
+
+	mov	ax,*6(bp)	|get y
+	mov	bx,#line_len	|get ax pointing to first char. of line y
+	mul	bx
+	add	ax,start_screen	|add in start of screen offset
+	and	ax,mem_mask	|wrap around at end of screen memory
+	shl	ax,*1		|two bytes per character
+	mov	si,ax
+	mov	di,*4(bp)	|get buf
+	cld			|set auto increment
+	mov	bx,mem_mask	|get value before changing data segment
+	mov	ax,screen	|set ds to screen memory
+	mov	ds,ax
+	mov	cx,#line_len	|load count
+loop3:	movw			|move char to buf.
+	and	si,bx		|wrap around at end of screen memory
+	loop	loop3		|do it for all 80 chars.
+
+	pop	ds
+	pop	si
+	pop	di
+	pop	bp
+	ret
+
+
+|nwrite_character(char,pos) - write character char to position pos
+| doesn't change the cursor position
+
+_nwrite_char:
+	push	bp
+	mov	bp,sp
+	push	ds
+
+	|figure out where to put the character
+	mov	bx,*6(bp)	|get position
+
+	inc 	bx
+	add	bx,start_screen	|add in start of screen offset
+
+	dec	bx
+	shl	bx,*1		|two bytes per char
+	and	bx,mem_mask	|wrap around at end of screen memory
+
+	mov	ax,screen	|set ds to screen memory
+	mov	ds,ax
+	mov	ax,*4(bp)	|get char, the attrib should have been passed
+	mov	(bx),ax		|put the character in its place
+
+	pop	ds
+	pop	bp
+	ret
+
+|write_character(char,pos) - write character char to position pos
+
+_write_char:
+	push	bp
+	mov	bp,sp
+	push	ds
+
+	|figure out where to put the character
+	mov	bx,*6(bp)	|get position
+	inc 	bx		|
+	mov	savpos,bx       |save cursor position so screen can move
+	add	bx,start_screen	|add in start of screen offset
+| excerpted from setcursor()
+	mov	dx,index	|set 6845 to accept low cursor address
+	mov	al,*low
+	out
+	mov	dx,data		|write low cursor address
+	mov	al,bl
+	out
+	mov	dx,index	|set 6845 to accept high cursor address
+	mov	al,*high
+	out
+	mov	al,bh		|write high cursor address
+	mov	dx,data
+	out
+| end of excerpt
+
+	dec	bx
+	shl	bx,*1		|two bytes per char
+	and	bx,mem_mask	|wrap around at end of screen memory
+
+	mov	ax,screen	|set ds to screen memory
+	mov	ds,ax
+	mov	ax,*4(bp)	|get char, the attrib should have been passed
+	mov	(bx),ax		|put the character in its place
+
+	pop	ds
+	pop	bp
+	ret
+
+
+|set_cursor() - put cursor at the position given by the global variable _pos
+	.text
+_set_cursor:
+	mov	ax,_pos		|get pos
+	mov	savpos,ax	|save it
+
+rst:
+	add	ax,start_screen	|add in start of screen offset
+	mov	bx,ax		|save cursor position
+
+|send cursor address to 6845
+	mov	dx,index	|set 6845 to accept low cursor address
+	mov	al,*low
+	out
+	mov	dx,data		|write low cursor address
+	mov	al,bl
+	out
+	mov	dx,index	|set 6845 to accept high cursor address
+	mov	al,*high
+	out
+	mov	al,bh		|write high cursor address
+	mov	dx,data
+	out
+
+	ret
+
+_rset_cursor:
+	mov	ax,savpos
+	jmp	rst		|go put the cursor out again
+	
+| scr_restore() - restores the 6845
+_scr_rest:
+	mov	bx,*0		|set start address to 0
+	mov	start_screen,bx
+	mov	dx,index	|set start addr high
+	mov	al,*start_h
+	out
+	inc	dx
+	mov	al,bh
+	out
+	mov	dx,index	|set start addr low
+	mov	al,*start_l
+	out
+	inc	dx
+	mov	al,bl
+	out
+	ret
+
+	
+	.data
+savpos:		.word	0	|cursor coordinate
+screen:		.word	0xb000	|screen refresh memory
+mem_mask:	.word	0x0fff	|mask for 2k buffer of words
+index:		.word	0x3b4	|6845 index register
+data:		.word	0x3b5	|6845 data register
+start_screen:	.word	0	|where the start of the screen is in the
+				|buffer memory
