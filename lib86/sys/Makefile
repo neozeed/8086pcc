@@ -1,15 +1,14 @@
-.SUFFIXES: .b
-.c.b: ; cc86 -c $<
+include ..\howto.mak
 
-OBJECTS=	handler.b io.b msd2dot0.b sys2.b dos.b rwbyte.b
+ASMOBJ = handler.b io.b msd2dot0.b dos.b rwbyte.b
+OBJECTS = sys2.b
 
-all:		$(OBJECTS)
+all:	$(OBJECTS) $(ASMOBJ)
+	ar cr ..\libc.a $(OBJECTS) $(ASMOBJ)
 
 msd2dot0.b:	msd2dot0.a86
 		a86 msd2dot0
 
-sys2.b:		sys2.c
-		cc86 -c sys2.c
 
 dos.b:		dos.a86
 		a86 dos
@@ -22,3 +21,7 @@ io.b: io.a86
 
 rwbyte.b:	rwbyte.a86
 		a86 rwbyte
+
+
+clean:
+	@del $(OBJECTS) $(ASMOBJ)

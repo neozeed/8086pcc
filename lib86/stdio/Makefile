@@ -1,5 +1,4 @@
-.SUFFIXES: .b
-.c.b: ; cc86 -c $<
+include ..\howto.mak
 
 OBJECTS =	fprintf.b sprintf.b printf.b scanf.b clrerr.b doscan.b\
 		doprnt.b fdopen.b fgetc.b fopen.b fgets.b fputc.b\
@@ -7,15 +6,9 @@ OBJECTS =	fprintf.b sprintf.b printf.b scanf.b clrerr.b doscan.b\
 		putchar.b puts.b putw.b	rdwr.b rew.b strout.b\
 		ungetc.b setbuf.b flsbuf.b filbuf.b data.b
 
-all:		$(OBJECTS)
+all:	$(OBJECTS)
+	ar cr ..\libc.a $(OBJECTS)
 
-$(OBJECTS):	../include/stdio.h
 
-doprnt.b:	doprnt.c
-		cc86 -8087 -c doprnt.c
-
-doscan.b:	doscan.c
-		cc86 -8087 -c doscan.c
-
-gcvt.b:		gcvt.c
-		cc86 -8087 -c gcvt.c
+clean:
+	@del $(OBJECTS)
