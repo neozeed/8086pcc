@@ -4,7 +4,7 @@ OBJ = ../../obj
 LIB = \pcc\lib
 INCLUDE = ../../include
 
-LIBS = -L$(LIB) -ludp -lether -lip -lnet -ltask -lh19 -lpc $(LIB)\nlibc.a
+LIBS = -L$(LIB) -ludp -lether -lip -lnet -ltask -lh19 -lpc $(LIB)\netlibc.a
 
 eping: ping.b
 #	cc86 -o eping ping.b -ludp -lether -lip -lnet -ltask -lnc -lh19

@@ -6,7 +6,7 @@ INCLUDE = ../../include
 
 OBJS = telnet.b telnet2.b time.b tn.b tnscreen.b
 
-LIBS = -L$(LIB) -ltftp -ltcp -ludp -lether -lnet -lip -ltask -lh19 -lnet -lpc $(LIB)\nlibc.a
+LIBS = -L$(LIB) -ltftp -ltcp -ludp -lether -lnet -lip -ltask -lh19 -lnet -lpc $(LIB)\netlibc.a
 
 etn: $(OBJS)
 #	cc86 -o etn tn.b -ludp -lether -lip -lnet -ltask -lnc -lh19

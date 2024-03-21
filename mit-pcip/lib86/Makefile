@@ -27,7 +27,7 @@ crt0.b:	crt0.a86
 install: nlibc.a
 #	copy /Y crt0.b $(LIBS)\crt0.b
 #	copy /Y libc.a $(LIBS)\libc.a
-	copy /Y nlibc.a $(LIBS)\nlibc.a
+	copy /Y nlibc.a $(LIBS)\netlibc.a
 
 zclean:
 	cd crt& nmake clean

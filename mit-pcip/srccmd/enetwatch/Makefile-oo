@@ -1,0 +1,23 @@
+.SUFFIXES: .c .a86 .b
+
+OBJ = ../../obj
+LIB = ../../lib
+OBJS = netwatch.b display.b screen.b time.b
+
+enetwatch: ${OBJS}
+	cc86 -o enetwatch ${OBJS} -lnet -lwether -ltask -lh19
+	setver86 enetwatch.com 50
+
+lint:
+	lint86 netwatch.c time.c screen.c -lwether -lnet -ltask -lh19 -lc -lpc
+
+all: enetwatch
+
+install:
+	mv enetwatch.com ${OBJ}
+
+.c.b:
+	cc86 -c -DDEBUG $*.c
+
+.a86.b:
+	a86 $*

@@ -1,7 +1,8 @@
 include ..\nhowto.mak
 
 
-LIB = ../../lib
+
+LIB = #../../lib
 INCLUDE = ../../include
 OBJS = enet.b et_close.b et_stat.b et_arp.b et_init.b et_demux.t.b \
 	et_send.b et_int.b ethint.b
@@ -9,14 +10,19 @@ OBJS = enet.b et_close.b et_stat.b et_arp.b et_init.b et_demux.t.b \
 WOBJS = enet.w et_close.b et_stat.w et_arp.b et_init.b et_demux.t.w \
 	et_send.w et_int.w ethint.b
 
+all:
+	nmake libether.a
+	nmake oclean
+	nmake libwether.a
+	nmake oclean
 
 libether.a: $(OBJS)
 	ar r libether.a $(OBJS)
 	ranlib libether.a
 
-libwether: $(WOBJS)
-	ar r $(LIB)/libwether.a $(WOBJS)
-	ranlib $(LIB)/libwether.a
+libwether.a: $(WOBJS)
+	ar r libwether.a $(WOBJS)
+	ranlib libwether.a
 
 $(OBJS) $(WOBJS): $(INCLUDE)/ether.h $(INCLUDE)/netbuf.h ether.h
 
@@ -32,14 +38,20 @@ lintlib:
 
 
 .c.w:
-	mv $*.b $*.save
-	cc86 -c -DDEBUG -DWATCH $*.c
-	mv $*.b $*.w
-	mv $*.save $*.b
+        $(CPP) $(CPPFLAGS) -DWATCH $*.c -o $*.i
+        $(CC1) < $*.i > $*.a86
+        @del $*.i
+        $(AS) $*.a86
+        @del $*.a86
+	ren $*.b $*.w
 
 ethint.b:
 	a86 $*
 
 clean:
 	@del $(OBJS)
-	@del libether.a
+	@del libether.a libwether.a
+	@del *.w
+
+oclean:
+	@del $(OBJS) *.b

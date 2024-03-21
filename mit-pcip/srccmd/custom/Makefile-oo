@@ -1,0 +1,31 @@
+# Description to build the network customizer
+
+.SUFFIXES: .b .a86		# 8086 assembly language, output from cc86
+
+LIB = ../../lib
+OBJ = ../../obj
+INCLUDE = ../../include
+OBJS = custom.b menu.b menu_def.b res.b
+
+all: custom.com
+
+install: custom.com
+	mv custom.com ${OBJ}
+
+custom.com: ${OBJS}
+	cc86 -o custom ${OBJS} -lh19 -lnet
+ 
+custom.b: custom.c menu.h ${INCLUDE}/custom.h
+
+menu_def.b: menu_def.c menu.h ${INCLUDE}/attrib.h
+
+menu.b: menu.c menu.h ${INCLUDE}/attrib.h
+
+lint:
+	lint86 custom.c menu.c menu_def.c res.c -lh19 -lnet -lc -lpc
+
+.c.b:
+	cc86 -c $*.c
+
+.a86.b:
+	a86 $*

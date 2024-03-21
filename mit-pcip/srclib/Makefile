@@ -36,6 +36,7 @@ install: em\libh19.a wpronet\libwv2.a
 	copy /Y em\libh19.a  $(LIBDIR)
 	copy /Y em\libsup.a  $(LIBDIR)
 	copy /Y ether\libether.a $(LIBDIR)
+	copy /Y ether\libwether.a $(LIBDIR)
 	copy /Y internet\libip.a $(LIBDIR)
 	copy /Y net\netcrt.b $(LIBDIR)
 	copy /Y net\libnet.a $(LIBDIR)
