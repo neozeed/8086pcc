@@ -1,5 +1,5 @@
 CPP = cpp
-CC1 = c86
+CC1 = nc86
 AS = a86
 LD = ld
 AR = ar

@@ -4,11 +4,11 @@ OBJ = ../../obj
 LIB = \pcc\lib
 INCLUDE = ../../include
 
-LIBS = -L$(LIB) -ludp -lether -lip -lnet -ltask -lh19 -lpc -lc
+LIBS = -L$(LIB) -ludp -lether -lip -lnet -ltask -lh19 -lpc $(LIB)\nlibc.a
 
 eping: ping.b
 #	cc86 -o eping ping.b -ludp -lether -lip -lnet -ltask -lnc -lh19
-	$(LD) $(LDFLAGS) -o eping.out $(LIB)\crt0.b ping.b $(LIBS)
+	$(LD) $(LDFLAGS) -o eping.out $(LIB)\netcrt.b ping.b $(LIBS)
 	$(CVT) eping.out eping.com
 #	setver86 eping.com 50
 
