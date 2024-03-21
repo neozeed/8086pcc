@@ -1,4 +1,4 @@
-include ..\howto.mak
+include ..\nhowto.mak
 
 
 LIB = ../../lib
@@ -6,6 +6,8 @@ INCLUDE = ../../include
 OBJS = printf.b netinit.b netclose.b netstats.b net_utils.b
 
 # install: net
+
+default: libnet.a netcrt.b
 
 libnet.a: $(OBJS)
 	ar r libnet.a $(OBJS)
@@ -36,3 +38,4 @@ net_utils.b:
 clean:
 	@del $(OBJS)
 	@del libnet.a
+	@del netcrt.b

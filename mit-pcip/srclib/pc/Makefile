@@ -1,4 +1,4 @@
-include ..\howto.mak
+include ..\nhowto.mak
 
 LIB = ../../lib
 OBJS = getopt.b _prints.b gencpy.b chirp.b io.b crock.b q.b \

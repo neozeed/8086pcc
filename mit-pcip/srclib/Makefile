@@ -32,11 +32,12 @@ clean:
 	cd udp& nmake clean
 	cd wpronet& nmake clean
 
-install:
+install: em\libh19.a wpronet\libwv2.a
 	copy /Y em\libh19.a  $(LIBDIR)
 	copy /Y em\libsup.a  $(LIBDIR)
 	copy /Y ether\libether.a $(LIBDIR)
 	copy /Y internet\libip.a $(LIBDIR)
+	copy /Y net\netcrt.b $(LIBDIR)
 	copy /Y net\libnet.a $(LIBDIR)
 	copy /Y pc\libpc.a $(LIBDIR)
 	copy /Y prof\libprof.a $(LIBDIR)

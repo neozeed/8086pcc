@@ -1,4 +1,4 @@
-include ..\howto.mak
+include ..\nhowto.mak
 
 
 H19OBJS = curse.b h19line.b em.b h19.b _wbyte.b h19key.b \

@@ -1,4 +1,4 @@
-include ..\howto.mak
+include ..\nhowto.mak
 
 LIB = ../../lib
 INCLUDE = ../../include
