@@ -1,0 +1,5 @@
+all:
+	cd ../stdio; make
+	cp ../stdio/*.b .
+	rm doscan.b gcvt.b
+	cc86 -c doscan.c

@@ -1,0 +1,7 @@
+|C library -- abort
+
+	.globl	_abort
+	.text
+_abort:
+	int	0x20		| this'll go back to DOS...
+	ret

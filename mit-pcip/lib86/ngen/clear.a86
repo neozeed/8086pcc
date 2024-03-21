@@ -1,0 +1,29 @@
+|Clear memory: clear(p, n) writes n bytes of zeros, starting at p
+
+	.globl	_clear
+	.text
+
+_clear:	push	bp
+	mov	bp,sp
+	push	di
+
+	cld			| positive direction.
+	mov	di,*4(bp)	| beginning of block
+	mov	cx,*6(bp)	| count
+	or	cx,cx
+	jz	Ldone		| check for zero count
+	mov	ax,*0		| used as source for sto
+
+	test	cx,*1		| words or bytes?
+	jz	Lword
+	repz
+	stob
+	j	Ldone
+
+Lword:	shr	cx,*1
+	repz
+	stow
+
+Ldone:	pop	di
+	pop	bp
+	ret

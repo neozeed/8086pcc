@@ -1,0 +1,69 @@
+	.data
+	.text
+	.globl	_mktemp
+_mktemp:
+	push	bp
+	mov	bp,sp
+	push	si
+	push	di
+	sub	sp,#LF1
+	call	_getpid
+	mov	si,ax
+	mov	di,*4(bp)
+L14:
+	mov	bx,di
+	inc	di
+	cmpb	(bx),*0
+	beq	L15
+	br	L14
+L15:
+	dec	di
+L16:
+	dec	di
+	cmpb	(di),*88
+	bne	L17
+	mov	ax,si
+	mov	dx,*0
+	mov	cx,*10
+	div	cx
+	add	dx,*48
+	movb	(di),dx
+	mov	ax,si
+	mov	dx,*0
+	mov	cx,*10
+	div	cx
+	mov	si,ax
+	br	L16
+L17:
+	inc	di
+	mov	*-6(bp),*97
+L19:
+	mov	ax,*0
+	push	ax
+	push	*4(bp)
+	call	_access
+	add	sp,*4
+	cmp	ax,*-1
+	beq	L20
+	cmp	*-6(bp),*122
+	bne	L21
+	mov	ax,#L22
+	br	L12
+L21:
+	mov	ax,*-6(bp)
+	movb	(di),ax
+	inc	*-6(bp)
+	br	L19
+L20:
+	mov	ax,*4(bp)
+	br	L12
+L12:
+	lea	sp,*-4(bp)
+	pop	di
+	pop	si
+	pop	bp
+	ret
+	LF1 = 2
+	.data
+L22:
+	.byte	47,0

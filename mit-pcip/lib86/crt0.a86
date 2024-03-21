@@ -2,6 +2,7 @@
 | Non-8087 version
 | Modified for MSDOS 2.0, 6/26/83 SAW
 | Modified again, 9/7/84 PZ + SAW
+| added version stuff, 10/84 Romkey
 
 | proper operation requires that this be linked as first file.
 
@@ -19,7 +20,7 @@
 	.globl	fpinit		| 8087 initialization
 	.globl	_dos_ini	| system call writearound initialization
 	.globl	_prints		| trivial string i/o for messages
-
+	.globl	_version
 qmark = 077	| question mark character
 space = 040	| space character
 grt	= 62	| greater than
@@ -39,7 +40,18 @@ and	= 38	| ampersand
 |	    stack
 |	---------------  <- min(base of data + 64K, top of memory)
 
+	.data
+	.even
+_version:
+	.zerow	1
+
+	.text
 || set up segment registers and stack pointer
+	jmp	crtstart
+version:
+	.word	0
+
+crtstart:
 	cli			| turn off interupts until segment hacking complete
 	mov	ax,#_etext+15	| top of program segment
 	movb	cl,*4		| convert into segment value
@@ -164,7 +176,8 @@ __bomb:	mov	ax,#Lmsg	| oops, tell user and then abort
 	call	_prints
 	int	0x20
 
-Lok:	mov	cx,#_end	| zero bss storage
+Lok:
+	mov	cx,#_end	| zero bss storage
 	mov	di,#_edata	| starting at end of initialized data
 	sub	cx,di
 	jz	Lclear		| no bss => nothing to do
@@ -175,13 +188,18 @@ Lok:	mov	cx,#_end	| zero bss storage
 
 Lclear:
 |	call	fpinit		| set up 8087 modes
+	seg	cs
+	mov	ax,version
+	mov	_version,ax
+
 	call	_dos_ini	| set up for system calls
 
 	call	_main		| let user do his thing...
 	add	sp,*4
 
 	push	ax
-	call	__exit		| clean up, etc.
+
+	call	_exit		| clean up, etc.
 
 	mov	bx,sp		| if anyone cares, put exit status in ax
 	mov	ax,*2(bx)
@@ -214,3 +232,6 @@ __stde:	.word	0
 
 Lmsg:	.ascii	"*** Not enough memory, aborting..."
 	.byte	0xa,0xd,0
+
+	.asciz "Copyright 1984 Massachusetts Institute of Technology"
+	.asciz "See notice in file <notice.h>"

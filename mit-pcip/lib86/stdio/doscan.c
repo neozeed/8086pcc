@@ -99,7 +99,6 @@ _innum(ptr, type, len, size, iop, eofptr)
 int **ptr, *eofptr;
 struct _iobuf *iop;
 {
-	extern double atof();
 	register char *np;
 	char numbuf[64];
 int c, base;
@@ -111,8 +110,6 @@ int c, base;
 	lcval = 0;
 	ndigit = 0;
 	scale = INT;
-	if (type=='e'||type=='f')
-		scale = FLOAT;
 	base = 10;
 	if (type=='o')
 		base = 8;
@@ -181,15 +178,6 @@ int c, base;
 		return(0);
 	*np++ = 0;
 	switch((scale<<4) | size) {
-
-	case (FLOAT<<4) | SHORT:
-	case (FLOAT<<4) | REGULAR:
-		*(*((float **)ptr)) = atof(numbuf);
-		break;
-
-	case (FLOAT<<4) | LONG:
-		*(*((double **)ptr)) = atof(numbuf);
-		break;
 
 	case (INT<<4) | SHORT:
 		**(short **)ptr = lcval;

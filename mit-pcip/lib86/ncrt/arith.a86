@@ -34,6 +34,8 @@ lmul:	mov	bx,sp
 | This should work for almul and aulmul
 
 	.globl	almul
+	.globl	aulmul
+aulmul:
 almul:	mov	bx,sp
 	mov	bx,*2(bx)	| load ptr to arg in bx
 	push	*2(bx)		| push high
@@ -221,6 +223,8 @@ ulrem:	mov	bx,sp
 	ret
 
 	.globl	aldiv
+	.globl	auldiv
+auldiv:
 aldiv:	push	bp		| This one is REALLY cheap! -SAW.
 	mov	bp,sp
 	push	bx
@@ -245,31 +249,4 @@ aldiv:	push	bp		| This one is REALLY cheap! -SAW.
 	pop	bp
 
 	ret
-
-	.globl	auldiv
-auldiv:	push	bp		| This one is REALLY cheap! -SAW.
-	mov	bp,sp
-	push	bx
-
-	mov	bx,*4(bp)	| adr for result.
-	mov	ax,*6(bp)	| divisor.
-	mov	dx,*8(bp)
-
-	push	bx
-	push	dx
-	push	ax
-	push	*2(bx)
-	push	*0(bx)
-	call	uldiv
-	add	sp,*8
-	pop	bx
-
-	mov	*0(bx),ax
-	mov	*2(bx),dx
-
-	pop	bx
-	pop	bp
-
-	ret
-
 

@@ -1,3 +1,5 @@
+LIB = ../lib
+
 remake:
 	- rm libc.a nlibc.a
 	make all
@@ -10,8 +12,8 @@ libc.a:
 	cd gen; make
 	cd stdio; make
 	ls crt/*.b gen/*.b sys/*.b stdio/*.b | sort -t/ +1 > t1
-	ar cr libc.a `lorder \`cat t1\` | tsort`;
-	ranlib libc.a
+        ar cr ${LIB}/libc.a `lorder86 \`cat t1\` | tsort`;
+        ranlib ${LIB}/libc.a
 	rm -f t1
 
 nlibc.a:
@@ -20,10 +22,10 @@ nlibc.a:
 	cd ngen; make
 	cd nstdio; make
 	ls ncrt/*.b ngen/*.b sys/*.b nstdio/*.b | sort -t/ +1 > t1
-	ar cr nlibc.a `lorder \`cat t1\` | tsort`;
-	ranlib nlibc.a
+        ar cr ${LIB}/libnc.a `lorder86 \`cat t1\` | tsort`;
+        ranlib ${LIB}/libnc.a
 	rm -f t1
 
 crt0.b:	crt0.a86
 	a86 crt0
-
+        mv crt0.b ${LIB}
